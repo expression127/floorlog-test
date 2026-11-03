@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Floor Log — Phase 0 connection test</title>
+<style>
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;max-width:480px;margin:0 auto;padding:16px;line-height:1.5;color:#111}
+  h1{font-size:20px}
+  label{display:block;font-weight:600;font-size:14px;margin-top:14px}
+  input,button{font-size:16px;padding:12px;margin:6px 0;width:100%;box-sizing:border-box;border-radius:8px;border:1px solid #ccc}
+  button{cursor:pointer;font-weight:600;background:#0C7566;color:#fff;border:0}
+  button.secondary{background:#fff;color:#111;border:1px solid #ccc}
+  #log{white-space:pre-wrap;background:#f0f0f0;padding:10px;border-radius:8px;font-size:12.5px;margin-top:14px;max-height:360px;overflow:auto;font-family:ui-monospace,Consolas,monospace}
+</style>
+</head>
+<body>
+<h1>Floor Log — Phase 0 connection test</h1>
+<p>This page is only for testing that the browser can reach the Apps Script backend. It is not the real app.</p>
+
+<label for="url">Apps Script web app URL (ends in <code>/exec</code>)</label>
+<input id="url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
+<button id="save" class="secondary">Save URL</button>
+
+<button id="echo">1. Send one echo</button>
+<button id="burst">2. Send 20 writes and time them</button>
+<button id="clear" class="secondary">Clear log</button>
+
+<div id="log" aria-live="polite"></div>
+
+<script>
+(function(){
+  'use strict';
+  var logEl = document.getElementById('log');
+  function log(s){ logEl.textContent += s + "\n"; logEl.scrollTop = logEl.scrollHeight; }
+
+  var urlInput = document.getElementById('url');
+  try { urlInput.value = localStorage.getItem('floorlog_test_url') || ''; } catch (e) {}
+
+  document.getElementById('save').onclick = function(){
+    try { localStorage.setItem('floorlog_test_url', urlInput.value.trim()); } catch (e) {}
+    log('Saved URL.');
+  };
+  document.getElementById('clear').onclick = function(){ logEl.textContent = ''; };
+
+  function call(action, payload){
+    var url = urlInput.value.trim();
+    if (!url) { return Promise.reject(new Error('No URL set. Paste the Apps Script URL and tap Save.')); }
+    var t0 = performance.now();
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(Object.assign({ action: action }, payload))
+    }).then(function (r) {
+      return r.text().then(function (text) {
+        return { status: r.status, ms: performance.now() - t0, text: text };
+      });
+    });
+  }
+
+  document.getElementById('echo').onclick = function(){
+    log('Sending echo...');
+    call('echo', { payload: { hello: 'floorlog', t: Date.now() } }).then(function (res) {
+      log('status ' + res.status + ' in ' + res.ms.toFixed(0) + 'ms: ' + res.text);
+    }).catch(function (err) {
+      log('ERROR: ' + (err && err.message ? err.message : err));
+    });
+  };
+
+  document.getElementById('burst').onclick = function(){
+    log('Running 20 sequential writes...');
+    var times = [];
+    var i = 0;
+    function next(){
+      if (i >= 20) {
+        var sorted = times.slice().sort(function (a, b) { return a - b; });
+        var median = sorted.length ? sorted[Math.floor(sorted.length / 2)] : NaN;
+        var worst = sorted.length ? sorted[sorted.length - 1] : NaN;
+        log('Done. median=' + median.toFixed(0) + 'ms worst=' + worst.toFixed(0) + 'ms successes=' + sorted.length + '/20');
+        log('all times (ms): ' + times.map(function (t) { return t.toFixed(0); }).join(', '));
+        return;
+      }
+      i++;
+      call('append', { id: 'spike-' + Date.now() + '-' + i, value: 'test ' + i }).then(function (res) {
+        times.push(res.ms);
+        log(i + '/20 status ' + res.status + ' ' + res.ms.toFixed(0) + 'ms');
+        next();
+      }).catch(function (err) {
+        log(i + '/20 ERROR: ' + (err && err.message ? err.message : err));
+        next();
+      });
+    }
+    next();
+  };
+})();
+</script>
+</body>
+</html>
