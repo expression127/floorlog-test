@@ -1,0 +1,1488 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Floor Log</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0C7566">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: one phone-width column; sticky header, content screens below, fixed action bar while logging. */
+:root{
+  --bg:#E7EBEE;--surface:#F5F7F8;--raised:#FFFFFF;--ink:#111A22;--muted:#586674;--line:#CBD3D9;
+  --accent:#0C7566;--accent-ink:#FFFFFF;--accent-soft:#D5ECE7;--pr:#8A5A00;--pr-bg:#F7E6BD;--danger:#A92E27;
+  --font-display:'Barlow Condensed','Arial Narrow',Arial,sans-serif;--font-body:'Barlow',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1317;--surface:#161D23;--raised:#1C252C;--ink:#E7ECF0;--muted:#92A0AB;--line:#2A353E;
+  --accent:#3CC4AD;--accent-ink:#04201B;--accent-soft:#16332F;--pr:#F2B63A;--pr-bg:#3A2E10;--danger:#FF8076;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1317;--surface:#161D23;--raised:#1C252C;--ink:#E7ECF0;--muted:#92A0AB;--line:#2A353E;
+  --accent:#3CC4AD;--accent-ink:#04201B;--accent-soft:#16332F;--pr:#F2B63A;--pr-bg:#3A2E10;--danger:#FF8076;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.4;max-width:100vw;overflow-x:hidden;
+  padding-block:0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bg)}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.wrap{max-width:560px;margin:0 auto;padding:6px 0 140px;min-width:0}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);max-width:560px;margin:0 auto;padding:12px 0 10px;border-bottom:1px solid var(--line)}
+.brandrow{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.brand{font-family:var(--font-display);font-weight:700;font-size:28px;letter-spacing:.06em;text-transform:uppercase;line-height:1}
+.brandmeta{display:flex;align-items:center;gap:8px}
+.tag{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:3px 7px;white-space:nowrap}
+.tag.demo{color:var(--pr);border-color:var(--pr)}
+.chipstat{font-size:12px;font-weight:600;border-radius:20px;padding:4px 10px;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;min-height:28px}
+.chipstat.ok{background:var(--accent-soft);color:var(--accent)}
+.chipstat.wait{background:var(--pr-bg);color:var(--pr)}
+.chipstat.off{background:var(--danger);color:#fff}
+.seg{display:grid;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:3px;gap:3px}
+.seg button{border:0;background:transparent;border-radius:6px;padding:10px 6px;font-weight:600;font-size:15px;color:var(--muted);min-height:40px}
+.seg button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+h2{font-family:var(--font-display);font-weight:600;font-size:22px;letter-spacing:.04em;text-transform:uppercase;margin:26px 0 10px;text-wrap:balance}
+h2.nm2{font-size:30px;margin:0;letter-spacing:.02em}
+h3{font-family:var(--font-display);font-weight:600;font-size:23px;letter-spacing:.02em;margin:0;text-wrap:balance}
+p{margin:0 0 10px}
+.muted{color:var(--muted)}.small{font-size:13.5px}
+.lbl{display:block;font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.cap{font-size:14px;color:var(--muted);margin:-4px 0 8px}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.sec{margin:18px 0 0}.inline{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.grow{flex:1;min-width:0;display:flex;flex-direction:column}
+select,.search,input[type=text],input[type=password],input[type=tel]{width:100%;max-width:100%;background:var(--raised);border:1px solid var(--line);border-radius:8px;padding:12px;min-height:48px}
+.inline select{width:auto;flex:1;min-width:140px}
+.btn{border:1px solid var(--line);background:var(--raised);border-radius:10px;padding:14px 16px;font-weight:600;min-height:52px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent}
+.btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn.block{width:100%;display:block;margin-top:14px}
+.btn.sm{min-height:44px;padding:9px 14px;font-size:15px}
+.btn[disabled]{opacity:.5}
+.lnk{border:0;background:transparent;color:var(--accent);font-weight:600;padding:10px 4px;min-height:44px;text-decoration:underline;text-underline-offset:3px}
+.back{border:0;background:transparent;font-weight:600;color:var(--accent);padding:12px 0;min-height:48px;font-size:17px}
+.list,.plain{list-style:none;margin:0;padding:0}
+.list>li{border-bottom:1px solid var(--line)}
+.item{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:transparent;padding:14px 0;min-height:68px}
+.nm{display:block;font-weight:600;font-size:17px}.sub{display:block;font-size:14px;color:var(--muted)}
+.av{width:44px;height:44px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-family:var(--font-display);font-weight:700;font-size:19px;letter-spacing:.04em;flex:none}
+.av.lg{width:56px;height:56px;font-size:23px}
+.chev{font-size:28px;color:var(--muted);line-height:1}
+.pill{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:20px;padding:4px 9px;flex:none}
+.pill.ok{background:var(--accent-soft);color:var(--accent)}.pill.off{background:var(--pr-bg);color:var(--pr)}
+.who{display:flex;align-items:center;gap:14px;margin:4px 0 6px}
+.banner{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--accent-soft);border-radius:10px;padding:12px 14px;margin:16px 0 0}
+.note{background:var(--pr-bg);color:var(--pr);border-radius:10px;padding:12px 14px;margin:14px 0 0}
+.errbox{background:var(--danger);color:#fff;border-radius:10px;padding:12px 14px;margin:14px 0 0}
+.logHead{display:flex;flex-direction:column;margin-bottom:10px}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:12px;padding:18px;margin:12px 0}
+.ex{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;margin:14px 0}
+.exh{display:flex;flex-direction:column;gap:2px}
+.last{font-size:14px;color:var(--muted);margin:8px 0 6px;padding:6px 0;border-top:1px solid var(--line)}
+.pend{color:var(--pr);font-weight:600}
+.sets{list-style:none;margin:6px 0 12px;padding:0;counter-reset:s}
+.sets li{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding:2px 0;counter-increment:s;min-height:44px}
+.sn::before{content:counter(s);font-family:var(--font-display);font-weight:700;font-size:18px;color:var(--muted);display:inline-block;width:22px}
+.sv{flex:1;font-weight:600;font-variant-numeric:tabular-nums}
+.pr{font-size:11px;font-weight:800;letter-spacing:.08em;background:var(--pr-bg);color:var(--pr);border-radius:4px;padding:3px 6px}
+.edt{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:1px 6px}
+.entry{border-top:1px solid var(--line);padding-top:10px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.step{min-width:0;margin-top:4px}
+.stepc{display:grid;grid-template-columns:52px minmax(0,1fr) 52px;gap:6px}
+.sb{height:56px;border:1px solid var(--line);background:var(--raised);border-radius:10px;font-size:28px;font-weight:600;line-height:1;padding:0}
+.stepc input{min-width:0;width:100%;height:56px;text-align:center;border:1px solid var(--line);border-radius:10px;background:var(--raised);font-family:var(--font-display);font-weight:700;font-size:32px;font-variant-numeric:tabular-nums}
+.unit{display:block;text-align:center;font-size:13px;color:var(--muted);margin-top:3px}
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:25;background:var(--surface);border-top:1px solid var(--line);
+  padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.bar>div{max-width:560px;margin:0 auto;display:flex;gap:8px}
+.bar .btn{padding:12px 10px}
+.bar .grow{flex:1;display:block}
+.done{margin-top:16px}
+.plain li{padding:10px 0;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.stack{margin-top:18px}
+.hist details{border-bottom:1px solid var(--line)}
+.hist summary{list-style:none;display:flex;flex-direction:column;gap:1px;padding:13px 0;min-height:56px;cursor:pointer;position:relative;padding-right:24px}
+.hist summary::-webkit-details-marker{display:none}
+.hist summary::after{content:"+";position:absolute;right:2px;top:12px;font-size:22px;color:var(--muted)}
+.hist details[open] summary::after{content:"\2212"}
+.hd{font-weight:600}
+.hbody{padding:0 0 12px}
+.hexn{font-weight:600;margin-top:8px}
+.hsets{list-style:none;margin:2px 0 0;padding:0}
+.hsets li{display:flex;gap:8px;align-items:center;font-variant-numeric:tabular-nums;min-height:34px;flex-wrap:wrap}
+.hsets .lnk{margin-left:auto;min-height:44px;padding:4px;display:inline-flex;align-items:center}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--raised);border-radius:999px;padding:10px 16px;font-weight:600;min-height:44px}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.hello{display:flex;flex-direction:column;margin-top:14px}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);margin:16px 0 0;border-block:1px solid var(--line)}
+.facts>div{padding:12px 8px 12px 0;min-width:0}
+.facts>div+div{padding-left:12px;border-left:1px solid var(--line)}
+.facts dt{font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.facts dd{margin:2px 0 0;font-family:var(--font-display);font-weight:700;font-size:34px;line-height:1.1;font-variant-numeric:tabular-nums}
+.facts small{font-size:16px;color:var(--muted)}
+.chart{width:100%;height:auto;display:block;margin-top:6px;overflow:visible}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.chart .ax{fill:var(--muted);font-size:11px;font-family:var(--font-body);font-variant-numeric:tabular-nums}
+.chart .lab{fill:var(--ink);font-size:13px;font-weight:700;font-family:var(--font-body)}
+.chart .ln{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.chart .area{fill:var(--accent);opacity:.12}
+.chart .dot{fill:var(--accent)}
+.chart .dotL{fill:var(--accent);stroke:var(--bg);stroke-width:2}
+.chart .bar{fill:var(--line)}.chart .barL{fill:var(--accent)}
+.loc{display:flex;flex-direction:column;gap:6px;padding:14px 0}
+.locn{display:flex;gap:16px;flex-wrap:wrap;font-size:14px;color:var(--muted)}.locn b{color:var(--ink);font-size:18px;font-family:var(--font-display);font-variant-numeric:tabular-nums}
+.rev{padding:14px 0}
+.revr{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.revr select{flex:1;min-width:150px;width:auto}
+.sheet-back{position:fixed;inset:0;background:rgba(8,12,15,.55);z-index:40;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);width:100%;max-width:560px;max-height:84vh;border-radius:16px 16px 0 0;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom,0px);border:1px solid var(--line);border-bottom:0}
+.sh{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line)}
+.sh .search{flex:1}
+.sl{overflow:auto;padding:0 16px 16px}.sl.pad{padding-top:14px}
+.pick{display:flex;flex-direction:column;align-items:flex-start;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:transparent;padding:12px 0;min-height:58px;font-weight:600}
+.pick .muted{font-weight:400}
+.custom{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)}
+.pad{padding-top:12px}
+.center{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px}
+.spin{width:28px;height:28px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:spin 0.8s linear infinite}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loginCard{max-width:380px;margin:12vh auto 0}
+.needs{background:var(--pr-bg);border-radius:10px;padding:10px 12px;margin:10px 0}
+.needs .nm{color:var(--pr)}
+@media (max-width:360px){.facts dd{font-size:28px}}
+@media (prefers-reduced-motion:no-preference){.btn,.sb,.chip{transition:background .12s}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="progress.js"></script>
+<script src="validation.js"></script>
+<script src="authorization.js"></script>
+<script src="queue.js"></script>
+<script src="config.js"></script>
+<script>
+(function(){
+'use strict';
+var DAY=864e5;
+var QS=new URLSearchParams(location.search);
+var DEMO=QS.get('demo')==='1';
+var API_URL=(window.FLOORLOG_CONFIG&&window.FLOORLOG_CONFIG.apiUrl)||'';
+
+/* ---------- small helpers ---------- */
+var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
+var fmtN=function(n){n=Number(n)||0;return String(Math.round(n*10)/10);};
+var mmss=function(s){s=Math.round(s||0);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
+var TZ=function(){return (STATE.config&&STATE.config.timezone)||'Asia/Singapore';};
+var fmtDate=function(iso){
+  var d=new Date(iso);
+  try{return new Intl.DateTimeFormat('en-SG',{weekday:'short',day:'numeric',month:'short',timeZone:TZ()}).format(d);}catch(e){return d.toLocaleDateString();}
+};
+var fmtTime=function(iso){
+  var d=new Date(iso);
+  try{return new Intl.DateTimeFormat('en-SG',{hour:'numeric',minute:'2-digit',timeZone:TZ()}).format(d);}catch(e){return d.toLocaleTimeString();}
+};
+function byId(a,id){for(var i=0;i<(a||[]).length;i++)if(a[i].id===id)return a[i];return null;}
+function uuid(){
+  if(window.crypto&&crypto.randomUUID)return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=Math.random()*16|0,v=c==='x'?r:(r&0x3|0x8);return v.toString(16);});
+}
+function ago(iso){var n=Math.round((Date.now()-new Date(iso).getTime())/DAY);return n<=0?'today':n===1?'yesterday':n+' days ago';}
+function initials(n){return String(n||'').split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase();}
+function safeLocalStorage(){try{var k='__t';localStorage.setItem(k,'1');localStorage.removeItem(k);return localStorage;}catch(e){return null;}}
+var LS=safeLocalStorage();
+
+/* ---------- tiny IndexedDB KV wrapper, falls back to localStorage ---------- */
+var IDB=(function(){
+  var dbp=null;
+  function open(){
+    if(dbp)return dbp;
+    dbp=new Promise(function(resolve){
+      if(!window.indexedDB){resolve(null);return;}
+      try{
+        var req=indexedDB.open('floorlog-db',1);
+        req.onupgradeneeded=function(){
+          var db=req.result;
+          if(!db.objectStoreNames.contains('kv'))db.createObjectStore('kv');
+          if(!db.objectStoreNames.contains('queue'))db.createObjectStore('queue',{keyPath:'opId'});
+          if(!db.objectStoreNames.contains('history'))db.createObjectStore('history');
+        };
+        req.onsuccess=function(){resolve(req.result);};
+        req.onerror=function(){resolve(null);};
+      }catch(e){resolve(null);}
+    });
+    return dbp;
+  }
+  function withStore(name,mode,fn){
+    return open().then(function(db){
+      if(!db)return lsFallback(name,fn);
+      return new Promise(function(resolve,reject){
+        var tx=db.transaction(name,mode),store=tx.objectStore(name);
+        var result;
+        try{result=fn(store);}catch(e){reject(e);return;}
+        tx.oncomplete=function(){resolve(result);};
+        tx.onerror=function(){reject(tx.error);};
+      });
+    });
+  }
+  function lsKey(name){return 'floorlog.idbfallback.'+name;}
+  function lsFallback(name,fn){
+    if(!LS)return Promise.resolve(fn===undefined?undefined:undefined);
+    var raw=LS.getItem(lsKey(name)); var map; try{map=raw?JSON.parse(raw):{};}catch(e){map={};}
+    var fakeStore={
+      get:function(k){return {result:map[k]};},
+      put:function(v,k){var key=k!=null?k:v.opId;map[key]=v;return {};},
+      delete:function(k){delete map[k];return {};},
+      getAll:function(){return {result:Object.keys(map).map(function(k){return map[k];})};},
+      getAllKeys:function(){return {result:Object.keys(map)};}
+    };
+    var r=fn(fakeStore);
+    LS.setItem(lsKey(name),JSON.stringify(map));
+    return Promise.resolve(r&&r.result!==undefined?r.result:r);
+  }
+  function get(storeName,key){
+    return withStore(storeName,'readonly',function(store){return store.get(key);}).then(function(reqOrVal){
+      return reqOrVal&&reqOrVal.result!==undefined?reqOrVal.result:reqOrVal;
+    });
+  }
+  function put(storeName,value,key){
+    return withStore(storeName,'readwrite',function(store){return key!=null?store.put(value,key):store.put(value);});
+  }
+  function del(storeName,key){
+    return withStore(storeName,'readwrite',function(store){return store.delete(key);});
+  }
+  function all(storeName){
+    return withStore(storeName,'readonly',function(store){return store.getAll();}).then(function(reqOrVal){
+      return (reqOrVal&&reqOrVal.result)||[];
+    });
+  }
+  return {get:get,put:put,del:del,all:all};
+})();
+
+/* ---------- Auth ---------- */
+var AUTH_KEY='floorlog.auth.v1';
+var Auth={
+  current:null,
+  load:function(){
+    if(!LS)return null;
+    try{var raw=LS.getItem(AUTH_KEY);this.current=raw?JSON.parse(raw):null;}catch(e){this.current=null;}
+    return this.current;
+  },
+  save:function(a){
+    this.current=a;
+    if(!LS)return;
+    try{LS.setItem(AUTH_KEY,JSON.stringify(a));}catch(e){}
+  },
+  clear:function(){
+    this.current=null;
+    if(!LS)return;
+    try{LS.removeItem(AUTH_KEY);}catch(e){}
+  },
+  isExpired:function(){
+    return !this.current||!this.current.expiresAt||Date.now()>this.current.expiresAt;
+  }
+};
+
+/* ---------- Api: the ONE network seam. Everything else calls through here. ---------- */
+var Api=(function(){
+  function rawRequest(action,body){
+    var payload=Object.assign({action:action,token:Auth.current&&Auth.current.token},body||{});
+    if(DEMO)return DemoApi.request(action,payload);
+    return fetch(API_URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify(payload)
+    }).then(function(r){
+      return r.text().then(function(text){
+        var parsed;
+        try{parsed=JSON.parse(text);}catch(e){return {ok:false,error:'bad_response',code:0};}
+        return parsed;
+      });
+    }).catch(function(err){
+      return {ok:false,error:'network_error',code:0,_network:true};
+    });
+  }
+  function login(loginId,pin){return rawRequest('login',{loginId:loginId,pin:pin});}
+  function bootstrap(){return rawRequest('bootstrap',{});}
+  function history(memberId){return rawRequest('history',{memberId:memberId});}
+  function sync(ops){return rawRequest('sync',{ops:ops});}
+  function addMember(fields){return rawRequest('addMember',fields);}
+  function setMemberStatus(fields){return rawRequest('setMemberStatus',fields);}
+  function assignClient(fields){return rawRequest('assignClient',fields);}
+  function approveExercise(fields){return rawRequest('approveExercise',fields);}
+  function mergeExercise(fields){return rawRequest('mergeExercise',fields);}
+  return {
+    login:login,bootstrap:bootstrap,history:history,sync:sync,
+    addMember:addMember,setMemberStatus:setMemberStatus,assignClient:assignClient,
+    approveExercise:approveExercise,mergeExercise:mergeExercise,
+    _raw:rawRequest
+  };
+})();
+
+/* ---------- Demo mode: an in-browser mock backend over sample data. ---------- *
+ * Shares the real authorization/validation/progress rules (authorization.js,
+ * validation.js, progress.js) so clicking around in demo mode behaves like
+ * the real backend would, without a network or a Sheet. Orchestration here
+ * is a simplified re-implementation of backend/src/Api.js's action handlers
+ * (that file needs real Apps Script services it can't fake in a browser). */
+var DemoApi=(function(){
+  var KEY='floorlog.demo.v2';
+  var PINS={owner:'111111',manager:'222222',trainer1:'333333',trainer2:'444444',member1:'666666'};
+
+  function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+  function seed(){
+    var r=rng(11);
+    var now=new Date();now.setHours(18,0,0,0);var T=now.getTime();
+    var locations=[{id:'L1',name:'Branch A'},{id:'L2',name:'Branch B'},{id:'L3',name:'Branch C'}];
+    var staff=[
+      {id:'s_owner',loginId:'owner',name:'Owner',role:'owner',active:true,locationIds:['L1','L2','L3']},
+      {id:'s_manager',loginId:'manager',name:'Manager',role:'manager',active:true,locationIds:['L1']},
+      {id:'s_trainer1',loginId:'trainer1',name:'Marcus Lee',role:'trainer',active:true,locationIds:['L1']},
+      {id:'s_trainer2',loginId:'trainer2',name:'Sofia Tan',role:'trainer',active:true,locationIds:['L2']}
+    ];
+    var members=[
+      {id:'m1',name:'Aisha Rahman',homeLocationId:'L1',status:'active',loginId:'member1'},
+      {id:'m2',name:'Daniel Ong',homeLocationId:'L1',status:'active'},
+      {id:'m3',name:'Priya Nair',homeLocationId:'L2',status:'expired'},
+      {id:'m4',name:'Unassigned Umar',homeLocationId:'L1',status:'active'}
+    ];
+    var assignments=[
+      {trainerId:'s_trainer1',memberId:'m1',active:true,since:'2025-09-01'},
+      {trainerId:'s_trainer1',memberId:'m2',active:true,since:'2025-09-01'},
+      {trainerId:'s_trainer2',memberId:'m3',active:true,since:'2025-09-01'}
+    ];
+    var LIB=[
+      ['squat','Back Squat','Legs','Barbell','weight_reps','bb squat,squat'],
+      ['bench','Bench Press','Chest','Barbell','weight_reps','bb bench,bench'],
+      ['rdl','Romanian Deadlift','Legs','Barbell','weight_reps','rdl'],
+      ['dl','Conventional Deadlift','Back','Barbell','weight_reps','deadlift,dl'],
+      ['ohp','Overhead Press','Shoulders','Barbell','weight_reps','ohp,shoulder press'],
+      ['latpd','Lat Pulldown','Back','Cable','weight_reps','pulldown'],
+      ['pullup','Pull-up','Back','Bodyweight','bodyweight_reps','chin up,chin-up'],
+      ['plank','Plank','Core','Bodyweight','time',''],
+      ['erg','Rowing Ergometer','Conditioning','Machine','distance','rower,erg'],
+      ['run','Treadmill Run','Conditioning','Machine','distance','treadmill']
+    ];
+    var exercises=LIB.map(function(x){return {id:x[0],name:x[1],muscleGroup:x[2],equipment:x[3],logType:x[4],aliases:x[5],review:'approved',createdBy:'',mergedInto:''};});
+    exercises.push({id:'c1',name:'Bench (Smith machine)',muscleGroup:'Other',equipment:'Machine',logType:'weight_reps',aliases:'',review:'pending',createdBy:'s_trainer2',mergedInto:''});
+
+    var sessions=[],sets=[],setEdits=[];
+    var PLAN={
+      m1:{weeks:10,offs:[1,4],skip:.1,trainerId:'s_trainer1',locationId:'L1',prog:[['squat',40,2.5],['bench',30,2.5],['rdl',50,5],['latpd',35,2.5],['plank',0,0]]},
+      m2:{weeks:10,offs:[2,5],skip:.4,trainerId:'s_trainer1',locationId:'L1',prog:[['dl',70,5],['ohp',35,2.5],['pullup',0,0],['erg',0,0]]}
+    };
+    Object.keys(PLAN).forEach(function(mid){
+      var p=PLAN[mid],list=[];
+      for(var wk=0;wk<p.weeks;wk++){p.offs.forEach(function(o){
+        if(r()<p.skip)return;
+        list.push(T-((p.weeks-1-wk)*7+o)*DAY);
+      });}
+      list.sort(function(a,b){return a-b;});
+      list.forEach(function(ts,i){
+        var sessId='demo-sess-'+mid+'-'+i;
+        sessions.push({id:sessId,memberId:mid,trainerId:p.trainerId,locationId:p.locationId,startedAt:new Date(ts).toISOString(),endedAt:new Date(ts+36e5).toISOString(),notes:'',createdAt:new Date(ts).toISOString()});
+        var pos=0;
+        p.prog.forEach(function(pr){
+          var exId=pr[0],ex=byId(exercises,exId);
+          if(ex.logType==='weight_reps'){
+            var w=pr[1]+pr[2]*Math.floor(i/2),base=exId==='dl'?5:8;
+            [base,base-(r()<.5?1:0),base-(r()<.6?1:0)].forEach(function(reps){
+              sets.push({id:'demo-set-'+mid+'-'+i+'-'+(pos++),sessionId:sessId,exerciseId:exId,position:pos,weightKg:w,reps:reps,seconds:null,distanceM:null,rpe:null,deletedAt:null,createdAt:new Date(ts).toISOString(),editedAt:null});
+            });
+          }else if(ex.logType==='bodyweight_reps'){
+            var x=4+Math.floor(i/3);
+            [x,x-1,x-1].forEach(function(reps){
+              sets.push({id:'demo-set-'+mid+'-'+i+'-'+(pos++),sessionId:sessId,exerciseId:exId,position:pos,weightKg:null,reps:reps,seconds:null,distanceM:null,rpe:null,deletedAt:null,createdAt:new Date(ts).toISOString(),editedAt:null});
+            });
+          }else if(ex.logType==='time'){
+            var sec=30+i*3;
+            for(var k=0;k<3;k++)sets.push({id:'demo-set-'+mid+'-'+i+'-'+(pos++),sessionId:sessId,exerciseId:exId,position:pos,weightKg:null,reps:null,seconds:sec-k*2,distanceM:null,rpe:null,deletedAt:null,createdAt:new Date(ts).toISOString(),editedAt:null});
+          }else{
+            for(var k2=0;k2<3;k2++)sets.push({id:'demo-set-'+mid+'-'+i+'-'+(pos++),sessionId:sessId,exerciseId:exId,position:pos,weightKg:null,reps:null,seconds:140-Math.floor(i/2)*2+Math.round(r()*3),distanceM:500,rpe:null,deletedAt:null,createdAt:new Date(ts).toISOString(),editedAt:null});
+          }
+        });
+      });
+    });
+    // One illustrative edit, with an audit row, on m1's first logged set.
+    if(sets.length){
+      var firstSet=sets.filter(function(s){return s.sessionId.indexOf('m1')>=0;})[0];
+      if(firstSet){
+        var before={weightKg:firstSet.weightKg,reps:firstSet.reps+1,seconds:firstSet.seconds,distanceM:firstSet.distanceM};
+        setEdits.push({id:'demo-edit-1',setId:firstSet.id,editedBy:'s_trainer1',editedAt:new Date(firstSet.createdAt).getTime()+36e5?new Date(new Date(firstSet.createdAt).getTime()+36e5).toISOString():firstSet.createdAt,action:'edit',beforeJson:JSON.stringify(before),afterJson:JSON.stringify({weightKg:firstSet.weightKg,reps:firstSet.reps,seconds:firstSet.seconds,distanceM:firstSet.distanceM})});
+        firstSet.editedAt=setEdits[0].editedAt;
+      }
+    }
+    return {
+      v:2,locations:locations,staff:staff,members:members,assignments:assignments,
+      exercises:exercises,sessions:sessions,sets:sets,setEdits:setEdits,
+      config:{timezone:'Asia/Singapore'}
+    };
+  }
+
+  function load(){
+    if(!LS)return seed();
+    try{var raw=LS.getItem(KEY);var o=raw?JSON.parse(raw):null;if(o&&o.v===2)return o;}catch(e){}
+    return seed();
+  }
+  var D=load();
+  function persist(){if(!LS)return;try{LS.setItem(KEY,JSON.stringify(D));}catch(e){}}
+
+  function enrichMember(m){
+    m.__activeAssignmentTrainerIds=D.assignments.filter(function(a){return a.memberId===m.id&&a.active;}).map(function(a){return a.trainerId;});
+    return m;
+  }
+  function actorFromToken(token){
+    if(!token)return null;
+    var parts=String(token).split(':'); // 'demo:staff:id' or 'demo:member:id'
+    if(parts[0]!=='demo')return null;
+    var kind=parts[1],id=parts[2];
+    if(kind==='staff'){
+      var s=byId(D.staff,id);if(!s||!s.active)return null;
+      return {kind:'staff',id:s.id,role:s.role,active:s.active,locationIds:s.locationIds,name:s.name};
+    }
+    if(kind==='member'){
+      var m=byId(D.members,id);if(!m)return null;
+      return {kind:'member',id:m.id,memberId:m.id,name:m.name};
+    }
+    return null;
+  }
+  function publicMember(m){return {id:m.id,name:m.name,homeLocationId:m.homeLocationId,status:m.status};}
+  function publicStaff(s){return {id:s.id,name:s.name,role:s.role,active:s.active,locationIds:s.locationIds};}
+  function publicExercise(e){return {id:e.id,name:e.name,muscleGroup:e.muscleGroup,equipment:e.equipment,logType:e.logType,aliases:e.aliases,review:e.review,createdBy:e.createdBy};}
+  function err(error,code){return {ok:false,error:error,code:code||400};}
+  function ok(data){return {ok:true,data:data};}
+
+  function doLogin(body){
+    var loginId=String(body.loginId||'').trim(),pin=String(body.pin||'');
+    var staffAcct=D.staff.filter(function(s){return s.loginId===loginId;})[0];
+    if(staffAcct){
+      if(!staffAcct.active||PINS[staffAcct.loginId]!==pin)return err('invalid_credentials',401);
+      var token='demo:staff:'+staffAcct.id;
+      return ok({token:token,kind:'staff',role:staffAcct.role,userId:staffAcct.id,name:staffAcct.name,expiresAt:Date.now()+12*3600000});
+    }
+    var memberAcct=D.members.filter(function(m){return m.loginId===loginId;})[0];
+    if(memberAcct){
+      if(PINS[memberAcct.loginId]!==pin)return err('invalid_credentials',401);
+      var mtoken='demo:member:'+memberAcct.id;
+      return ok({token:mtoken,kind:'member',role:'member',userId:memberAcct.id,name:memberAcct.name,expiresAt:Date.now()+12*3600000});
+    }
+    return err('invalid_credentials',401);
+  }
+
+  function doBootstrap(actor){
+    var exercises=D.exercises.filter(function(e){return canSeeExercise(actor,e);}).map(publicExercise);
+    var members,assignments=[];
+    if(actor.kind==='member'){
+      var self=byId(D.members,actor.memberId);
+      members=self?[publicMember(enrichMember(self))]:[];
+    }else{
+      members=D.members.map(enrichMember).filter(function(m){return canSeeMember(actor,m);}).map(publicMember);
+      assignments=D.assignments.filter(function(a){
+        var m=byId(D.members,a.memberId);if(!m)return false;enrichMember(m);
+        return canSeeAssignment(actor,a,m);
+      });
+    }
+    var staffList=[];
+    if(actor.kind==='staff'){
+      staffList=D.staff.filter(function(s){
+        var shared=actor.role==='manager'&&s.locationIds.some(function(l){return actor.locationIds.indexOf(l)>=0;});
+        return canSeeStaff(actor,s,shared);
+      }).map(publicStaff);
+    }
+    return ok({role:actor.kind==='staff'?actor.role:'member',locations:D.locations,members:members,assignments:assignments,exercises:exercises,staff:staffList,config:D.config});
+  }
+
+  function doHistory(actor,body){
+    var member=byId(D.members,body.memberId);
+    if(member)enrichMember(member);
+    if(!member||!canSeeMember(actor,member))return err('forbidden',403);
+    var sessions=D.sessions.filter(function(s){return s.memberId===body.memberId;});
+    var sessionIds={};sessions.forEach(function(s){sessionIds[s.id]=true;});
+    var sets=D.sets.filter(function(s){return sessionIds[s.sessionId];});
+    var setEdits=[];
+    if(actor.kind==='staff'){
+      var setIds={};sets.forEach(function(s){setIds[s.id]=true;});
+      setEdits=D.setEdits.filter(function(e){return setIds[e.setId];}).filter(function(e){
+        var set=byId(sets,e.setId);if(!set)return false;
+        var session=byId(sessions,set.sessionId);
+        return session&&canSeeAudit(actor,session);
+      });
+    }
+    return ok({sessions:sessions,sets:sets,setEdits:setEdits});
+  }
+
+  function doAddMember(actor,body){
+    if(!canAddMember(actor,body.homeLocationId))return err('forbidden',403);
+    var name=sanitizeText(body.name,80);
+    if(!name)return err('missing_name',400);
+    var member={id:body.id||uuid(),name:name,homeLocationId:body.homeLocationId,status:'active'};
+    D.members.push(member);persist();
+    return ok(publicMember(member));
+  }
+  function doSetMemberStatus(actor,body){
+    var member=byId(D.members,body.memberId);
+    if(!member)return err('not_found',404);
+    if(!canUpdateMember(actor,member))return err('forbidden',403);
+    if(body.status!=='active'&&body.status!=='expired')return err('bad_status',400);
+    member.status=body.status;persist();
+    return ok(publicMember(member));
+  }
+  function doAssignClient(actor,body){
+    var member=byId(D.members,body.memberId);if(member)enrichMember(member);
+    if(!member)return err('not_found',404);
+    if(!canAssignClient(actor,member))return err('forbidden',403);
+    var trainer=byId(D.staff,body.trainerId);
+    if(!trainer||trainer.role!=='trainer'||!trainer.active)return err('bad_trainer',400);
+    var existing=D.assignments.filter(function(a){return a.trainerId===body.trainerId&&a.memberId===body.memberId;})[0];
+    if(existing)existing.active=true;
+    else D.assignments.push({trainerId:body.trainerId,memberId:body.memberId,active:true,since:new Date().toISOString().slice(0,10)});
+    persist();
+    return ok({trainerId:body.trainerId,memberId:body.memberId});
+  }
+  function doApproveExercise(actor,body){
+    var exercise=byId(D.exercises,body.exerciseId);
+    if(!exercise)return err('not_found',404);
+    if(!canApproveExercise(actor,exercise))return err('forbidden',403);
+    exercise.review='approved';persist();
+    return ok(publicExercise(exercise));
+  }
+  function doMergeExercise(actor,body){
+    var dup=byId(D.exercises,body.dupId),keep=byId(D.exercises,body.keepId);
+    if(!dup||!keep)return err('not_found',404);
+    if(!canMergeExercise(actor,dup))return err('forbidden',403);
+    if(dup.id===keep.id)return err('cannot_merge_into_self',400);
+    if(!canMergeExercises(dup.logType,keep.logType))return err('log_type_mismatch',400);
+    D.sets.forEach(function(s){if(s.exerciseId===dup.id)s.exerciseId=keep.id;});
+    dup.mergedInto=keep.id;dup.review='approved';persist();
+    return ok({dupId:dup.id,keepId:keep.id});
+  }
+
+  function syncOp(actor,op){
+    if(op.type==='createSession'){
+      var existing=byId(D.sessions,op.id);
+      if(existing)return {ok:true,data:{id:existing.id,duplicate:true}};
+      var member=byId(D.members,op.memberId);if(member)enrichMember(member);
+      if(!member)return {ok:false,error:'not_found',code:404};
+      if(!canCreateSession(actor,member,op.trainerId,op.locationId))return {ok:false,error:'forbidden',code:403};
+      D.sessions.push({id:op.id,memberId:op.memberId,trainerId:op.trainerId,locationId:op.locationId,startedAt:op.startedAt||new Date().toISOString(),endedAt:null,notes:sanitizeText(op.notes,500),createdAt:new Date().toISOString()});
+      return {ok:true,data:{id:op.id}};
+    }
+    if(op.type==='finishSession'){
+      var session=byId(D.sessions,op.id);
+      if(!session)return {ok:false,error:'not_found',code:404};
+      var m2=byId(D.members,session.memberId);if(m2)enrichMember(m2);
+      if(!m2||!canUpdateSession(actor,session,m2))return {ok:false,error:'forbidden',code:403};
+      session.endedAt=op.endedAt||new Date().toISOString();
+      if(op.notes!=null)session.notes=sanitizeText(op.notes,500);
+      return {ok:true,data:{id:session.id}};
+    }
+    if(op.type==='addSet'){
+      var existingSet=byId(D.sets,op.id);
+      if(existingSet)return {ok:true,data:{id:existingSet.id,duplicate:true}};
+      var sess=byId(D.sessions,op.sessionId);
+      if(!sess)return {ok:false,error:'not_found',code:404};
+      var m3=byId(D.members,sess.memberId);if(m3)enrichMember(m3);
+      if(!m3||!canAddSet(actor,sess,m3))return {ok:false,error:'forbidden',code:403};
+      var ex=byId(D.exercises,op.exerciseId);
+      if(!ex||ex.mergedInto)return {ok:false,error:'bad_exercise',code:400};
+      var check=validateSetFields(ex.logType,{weightKg:op.weightKg,reps:op.reps,seconds:op.seconds,distanceM:op.distanceM,rpe:op.rpe});
+      if(!check.ok)return {ok:false,error:check.error,code:400};
+      var set={id:op.id,sessionId:op.sessionId,exerciseId:op.exerciseId,position:op.position||0,
+        weightKg:op.weightKg!=null?op.weightKg:null,reps:op.reps!=null?op.reps:null,seconds:op.seconds!=null?op.seconds:null,
+        distanceM:op.distanceM!=null?op.distanceM:null,rpe:op.rpe!=null?op.rpe:null,deletedAt:null,createdAt:new Date().toISOString(),editedAt:null};
+      D.sets.push(set);
+      return {ok:true,data:{id:set.id}};
+    }
+    if(op.type==='editSet'){
+      var set2=byId(D.sets,op.id);
+      if(!set2)return {ok:false,error:'not_found',code:404};
+      var sess2=byId(D.sessions,set2.sessionId);
+      var m4=byId(D.members,sess2.memberId);if(m4)enrichMember(m4);
+      if(!m4||!canEditOrDeleteSet(actor,sess2,m4))return {ok:false,error:'forbidden',code:403};
+      var ex2=byId(D.exercises,set2.exerciseId);
+      var check2=validateSetFields(ex2.logType,{weightKg:op.weightKg,reps:op.reps,seconds:op.seconds,distanceM:op.distanceM,rpe:op.rpe});
+      if(!check2.ok)return {ok:false,error:check2.error,code:400};
+      var before2={weightKg:set2.weightKg,reps:set2.reps,seconds:set2.seconds,distanceM:set2.distanceM,rpe:set2.rpe};
+      set2.weightKg=op.weightKg!=null?op.weightKg:null;set2.reps=op.reps!=null?op.reps:null;set2.seconds=op.seconds!=null?op.seconds:null;
+      set2.distanceM=op.distanceM!=null?op.distanceM:null;set2.rpe=op.rpe!=null?op.rpe:null;set2.editedAt=new Date().toISOString();
+      D.setEdits.push({id:uuid(),setId:set2.id,editedBy:actor.id,editedAt:set2.editedAt,action:'edit',beforeJson:JSON.stringify(before2),afterJson:JSON.stringify({weightKg:set2.weightKg,reps:set2.reps,seconds:set2.seconds,distanceM:set2.distanceM,rpe:set2.rpe})});
+      return {ok:true,data:{id:set2.id}};
+    }
+    if(op.type==='deleteSet'){
+      var set3=byId(D.sets,op.id);
+      if(!set3)return {ok:false,error:'not_found',code:404};
+      var sess3=byId(D.sessions,set3.sessionId);
+      var m5=byId(D.members,sess3.memberId);if(m5)enrichMember(m5);
+      if(!m5||!canEditOrDeleteSet(actor,sess3,m5))return {ok:false,error:'forbidden',code:403};
+      if(set3.deletedAt)return {ok:true,data:{id:set3.id,duplicate:true}};
+      var before3={weightKg:set3.weightKg,reps:set3.reps,seconds:set3.seconds,distanceM:set3.distanceM,rpe:set3.rpe};
+      set3.deletedAt=new Date().toISOString();set3.editedAt=set3.deletedAt;
+      D.setEdits.push({id:uuid(),setId:set3.id,editedBy:actor.id,editedAt:set3.deletedAt,action:'delete',beforeJson:JSON.stringify(before3),afterJson:JSON.stringify(Object.assign({},before3,{deletedAt:set3.deletedAt}))});
+      return {ok:true,data:{id:set3.id}};
+    }
+    if(op.type==='addCustomExercise'){
+      if(!canCreateExercise(actor))return {ok:false,error:'forbidden',code:403};
+      var existingEx=byId(D.exercises,op.id);
+      if(existingEx)return {ok:true,data:{id:existingEx.id,duplicate:true}};
+      var name=sanitizeText(op.name,80);
+      if(!name)return {ok:false,error:'missing_name',code:400};
+      if(LOG_TYPES.indexOf(op.logType)<0)return {ok:false,error:'bad_log_type',code:400};
+      var allNames=D.exercises.filter(function(e){return !e.mergedInto;}).map(function(e){return e.name;});
+      if(isDuplicateExerciseName(name,allNames))return {ok:false,error:'duplicate_name',code:409};
+      var exercise={id:op.id,name:name,muscleGroup:sanitizeText(op.muscleGroup||'Other',40),equipment:sanitizeText(op.equipment||'Other',40),logType:op.logType,aliases:sanitizeText(op.aliases||'',200),review:'pending',createdBy:actor.id,mergedInto:''};
+      D.exercises.push(exercise);
+      return {ok:true,data:publicExercise(exercise)};
+    }
+    return {ok:false,error:'unknown_op',code:400};
+  }
+
+  function doSync(actor,body){
+    var ops=Array.isArray(body.ops)?body.ops:[];
+    var results=ops.map(function(op){
+      try{var r=syncOp(actor,op);return Object.assign({opId:op.opId},r);}
+      catch(e){return {opId:op.opId,ok:false,error:String(e&&e.message||e),code:500};}
+    });
+    persist();
+    return ok({results:results});
+  }
+
+  function request(action,body){
+    body=body||{};
+    if(action==='login')return Promise.resolve(doLogin(body));
+    var actor=actorFromToken(body.token);
+    if(!actor)return Promise.resolve(err('account_disabled',401));
+    var fn={
+      bootstrap:function(){return doBootstrap(actor);},
+      history:function(){return doHistory(actor,body);},
+      sync:function(){return doSync(actor,body);},
+      addMember:function(){return doAddMember(actor,body);},
+      setMemberStatus:function(){return doSetMemberStatus(actor,body);},
+      assignClient:function(){return doAssignClient(actor,body);},
+      approveExercise:function(){return doApproveExercise(actor,body);},
+      mergeExercise:function(){return doMergeExercise(actor,body);}
+    }[action];
+    if(!fn)return Promise.resolve(err('unknown_action',400));
+    return Promise.resolve(fn());
+  }
+
+  return {request:request,PINS:PINS,resetSeed:function(){D=seed();persist();}};
+})();
+
+/* ---------- offline write queue ----------
+ * The decision logic (what's a sync op vs a management action, which
+ * failures are permanent, ordered batched flush, backoff) lives in
+ * queue.js so it can be unit-tested under Node (suite 5). This just wires
+ * that module to the real IndexedDB-backed queue store, localStorage-backed
+ * "needs attention" list, the real Api, and navigator.onLine. */
+var NEEDS_KEY='floorlog.needsAttention.v1';
+var queueListeners=[];
+var Queue=FloorLogQueue.createQueue({
+  storage:{
+    put:function(item){return IDB.put('queue',item);}, // 'queue' store uses the in-line key opId — no explicit key argument
+    all:function(){return IDB.all('queue');},
+    del:function(opId){return IDB.del('queue',opId);}
+  },
+  needsStore:{
+    load:function(){if(!LS)return [];try{return JSON.parse(LS.getItem(NEEDS_KEY)||'[]');}catch(e){return [];}},
+    save:function(list){if(!LS)return;try{LS.setItem(NEEDS_KEY,JSON.stringify(list));}catch(e){}}
+  },
+  api:{
+    sync:function(ops){return Api.sync(ops);},
+    addMember:function(p){return Api.addMember(p);},
+    setMemberStatus:function(p){return Api.setMemberStatus(p);},
+    assignClient:function(p){return Api.assignClient(p);},
+    approveExercise:function(p){return Api.approveExercise(p);},
+    mergeExercise:function(p){return Api.mergeExercise(p);}
+  },
+  isOnline:function(){return navigator.onLine;},
+  onChange:function(){queueListeners.forEach(function(fn){try{fn();}catch(e){}});}
+});
+Queue.onChange=function(fn){queueListeners.push(fn);};
+window.addEventListener('online',function(){Queue.flush();});
+setInterval(function(){Queue.list().then(function(items){if(items.length)Queue.flush();});},30000);
+
+/* ---------- cache: lets the log screen open instantly and offline ---------- */
+var Cache={
+  saveBootstrap:function(data){return IDB.put('kv',data,'bootstrap');},
+  loadBootstrap:function(){return IDB.get('kv','bootstrap');},
+  saveHistory:function(memberId,data){return IDB.put('history',data,memberId);},
+  loadHistory:function(memberId){return IDB.get('history',memberId);}
+};
+
+/* ---------- draft: the session currently being logged, local-first ---------- */
+var DRAFT_KEY='floorlog.draft.v1';
+var Draft={
+  current:null,
+  load:function(){
+    if(!LS){this.current=null;return null;}
+    try{this.current=JSON.parse(LS.getItem(DRAFT_KEY)||'null');}catch(e){this.current=null;}
+    return this.current;
+  },
+  save:function(){if(!LS)return;try{LS.setItem(DRAFT_KEY,JSON.stringify(this.current));}catch(e){}},
+  clear:function(){this.current=null;if(LS)try{LS.removeItem(DRAFT_KEY);}catch(e){}}
+};
+
+/* ============================================================ UI ============================================================ */
+var STATE={
+  screen:'boot',bootError:null,boot:null,personId:null,lastSessionId:null,
+  historyCache:{},sheet:null,query:'',chartEx:null,confirmDiscard:false,nav:true,
+  queueStatus:{state:'synced',count:0},section:null,loginError:null,busy:false
+};
+
+function exById(id){return byId(STATE.boot&&STATE.boot.exercises,id);}
+function memberById(id){return byId(STATE.boot&&STATE.boot.members,id);}
+function locName(id){var l=byId(STATE.boot&&STATE.boot.locations,id);return l?l.name:id;}
+function staffById(id){return byId(STATE.boot&&STATE.boot.staff,id);}
+function pill(m){return '<span class="pill '+(m.status==='active'?'ok':'off')+'">'+(m.status==='active'?'Active':'Expired')+'</span>';}
+function role(){return Auth.current&&Auth.current.role;}
+function kind(){return Auth.current&&Auth.current.kind;}
+
+function fmtSet(e,s){
+  if(e.logType==='weight_reps')return fmtN(s.weightKg)+' kg × '+s.reps;
+  if(e.logType==='bodyweight_reps')return s.reps+' reps';
+  if(e.logType==='time')return mmss(s.seconds);
+  return s.distanceM+' m · '+mmss(s.seconds);
+}
+function compact(e,sets){
+  if(!sets.length)return '';
+  if(e.logType==='weight_reps'){
+    var groups=[];sets.forEach(function(s){var g=groups[groups.length-1];if(g&&g.w===s.weightKg)g.r.push(s.reps);else groups.push({w:s.weightKg,r:[s.reps]});});
+    return groups.map(function(g){return fmtN(g.w)+' kg × '+g.r.join(', ');}).join(' · ');
+  }
+  if(e.logType==='bodyweight_reps')return sets.map(function(s){return s.reps;}).join(', ')+' reps';
+  if(e.logType==='time')return sets.map(function(s){return mmss(s.seconds);}).join(', ');
+  return sets.map(function(s){return s.distanceM+' m in '+mmss(s.seconds);}).join(', ');
+}
+function volumeOf(sets){return sets.reduce(function(a,s){var e=exById(s.exerciseId);return a+(e&&e.logType==='weight_reps'&&s.reps>0&&s.weightKg!=null?s.weightKg*s.reps:0);},0);}
+function groupByEx(sets){var order=[],map={};sets.forEach(function(s){if(!map[s.exerciseId]){map[s.exerciseId]=[];order.push(s.exerciseId);}map[s.exerciseId].push(s);});return order.map(function(id){return {exId:id,sets:map[id]};});}
+function diffText(e,b,a){
+  var p=[];
+  if(e.logType==='weight_reps'&&b.weightKg!==a.weightKg)p.push(fmtN(b.weightKg)+' → '+fmtN(a.weightKg)+' kg');
+  if((e.logType==='weight_reps'||e.logType==='bodyweight_reps')&&b.reps!==a.reps)p.push(b.reps+' → '+a.reps+' reps');
+  if((e.logType==='time'||e.logType==='distance')&&b.seconds!==a.seconds)p.push(mmss(b.seconds)+' → '+mmss(a.seconds));
+  if(e.logType==='distance'&&b.distanceM!==a.distanceM)p.push(b.distanceM+' → '+a.distanceM+' m');
+  return p.join(', ')||'no change';
+}
+
+/* history: fetch (or use cache offline), merge the local draft, compute PRs */
+function withHistory(memberId,fn){
+  var cached=STATE.historyCache[memberId];
+  function finish(h){STATE.historyCache[memberId]=h;fn(h);render();}
+  if(cached&&cached.loading)return;
+  STATE.historyCache[memberId]={loading:true};
+  Api.history(memberId).then(function(res){
+    if(res.ok){
+      Cache.saveHistory(memberId,res.data);
+      finish({sessions:res.data.sessions,sets:res.data.sets,setEdits:res.data.setEdits,stale:false,error:null});
+    }else if(res._network){
+      Cache.loadHistory(memberId).then(function(c){
+        finish(c?{sessions:c.sessions,sets:c.sets,setEdits:c.setEdits,stale:true,error:null}:{sessions:[],sets:[],setEdits:[],stale:true,error:'offline_no_cache'});
+      });
+    }else{
+      finish({sessions:[],sets:[],setEdits:[],stale:false,error:res.error||'load_failed'});
+    }
+  });
+}
+// Sets from the active draft for this member that haven't been confirmed by the server yet.
+function draftSetsFor(memberId){
+  var d=Draft.current;if(!d||d.memberId!==memberId)return [];
+  var out=[];d.exercises.forEach(function(blk){blk.sets.forEach(function(s){out.push(Object.assign({exerciseId:blk.exerciseId,sessionId:d.id,sessionStartedAt:d.startedAt},s));});});
+  return out;
+}
+function allSetsFor(memberId,h){
+  var fromHistory=(h&&h.sets||[]).map(function(s){var sess=byId(h.sessions,s.sessionId);return Object.assign({},s,{sessionStartedAt:sess?new Date(sess.startedAt).getTime():0});});
+  return fromHistory.concat(draftSetsFor(memberId).map(function(s){return Object.assign({},s,{sessionStartedAt:new Date(s.sessionStartedAt||Date.now()).getTime()});}));
+}
+function prMapFor(memberId,h){
+  var withTypes=allSetsFor(memberId,h).map(function(s){var e=exById(s.exerciseId);return Object.assign({},s,{logType:e?e.logType:null});}).filter(function(s){return s.logType;});
+  return computePRs(withTypes);
+}
+
+/* ---------- boot / login ---------- */
+function boot(){
+  Auth.load();Draft.load();
+  if(DEMO&&!Auth.current){ /* demo still requires picking a quick-login account */ }
+  if(Auth.current&&!Auth.isExpired()){
+    loadBootstrap(true);
+  }else{
+    Auth.clear();STATE.screen='login';render();
+  }
+}
+function loadBootstrap(fromBoot){
+  STATE.screen='booting';render();
+  Api.bootstrap().then(function(res){
+    if(res.ok){
+      STATE.boot=res.data;STATE.bootError=null;
+      Cache.saveBootstrap(res.data);
+      afterBoot();
+    }else if(res._network&&fromBoot){
+      Cache.loadBootstrap().then(function(c){
+        if(c){STATE.boot=c;STATE.bootError='offline_cached';afterBoot();}
+        else{STATE.screen='login';STATE.loginError='Cannot reach the server and nothing is cached yet. Connect and log in again.';Auth.clear();render();}
+      });
+    }else{
+      if(res.code===401){Auth.clear();STATE.screen='login';STATE.loginError='Your session ended. Please log in again.';render();}
+      else{STATE.bootError=res.error||'load_failed';STATE.screen='login';render();}
+    }
+  });
+}
+function afterBoot(){
+  STATE.nav=true;
+  if(kind()==='member'){STATE.screen='person';STATE.personId=Auth.current.userId;}
+  else{var s=role()==='owner'?'branches':'people';STATE.screen=s;STATE.section=s;}
+  render();
+  Queue.flush();
+  refreshQueueChip();
+}
+function refreshQueueChip(){Queue.status().then(function(st){STATE.queueStatus=st;renderChipOnly();});}
+Queue.onChange(refreshQueueChip);
+window.addEventListener('online',refreshQueueChip);
+window.addEventListener('offline',refreshQueueChip);
+setInterval(refreshQueueChip,15000);
+
+/* ---------- header / chip ---------- */
+function chipHtml(){
+  if(DEMO)return '';
+  var st=STATE.queueStatus;
+  if(st.state==='offline')return '<span class="chipstat off">Offline ('+st.count+' waiting)</span>';
+  if(st.state==='syncing')return '<span class="chipstat wait">Syncing ('+st.count+')</span>';
+  return '<span class="chipstat ok">Synced</span>';
+}
+function renderChipOnly(){
+  var el=document.getElementById('syncChip');
+  if(el)el.outerHTML=chipHtml().replace('<span','<span id="syncChip"');
+}
+function headerHtml(){
+  var segRoles,segLabels;
+  if(role()==='owner'){segRoles=['branches','people','review'];segLabels={branches:'Branches',people:'Members',review:'Review'};}
+  else if(role()==='manager'){segRoles=['people','review'];segLabels={people:'Members',review:'Review'};}
+  else segRoles=null;
+  var seg='';
+  if(segRoles&&(STATE.screen==='people'||STATE.screen==='review'||STATE.screen==='branches')){
+    seg='<div class="seg" style="grid-template-columns:repeat('+segRoles.length+',1fr)" role="tablist" aria-label="Section">'+
+      segRoles.map(function(s){return '<button type="button" role="tab" aria-selected="'+(STATE.section===s)+'" data-a="section" data-id="'+s+'">'+segLabels[s]+'</button>';}).join('')+'</div>';
+  }
+  var who=Auth.current?('<button type="button" class="lnk" data-a="logout" style="padding:4px 0">Log out</button>'):'';
+  return '<header class="top"><div class="brandrow"><span class="brand">Floor Log</span><div class="brandmeta">'+
+    (DEMO?'<span class="tag demo">Sample data</span>':'<span id="syncChip">'+chipHtml()+'</span>')+
+    who+'</div></div>'+seg+'</header>';
+}
+
+/* ---------- render dispatcher ---------- */
+function render(){
+  var app=document.getElementById('app');if(!app)return;
+  var y=window.scrollY||0,body='',header='';
+  if(STATE.screen==='login'){
+    body=renderLogin();
+    app.innerHTML='<main class="wrap">'+body+'</main>'+sheetHtml();
+  }else if(STATE.screen==='booting'){
+    app.innerHTML='<main class="wrap"><div class="center"><div class="spin" aria-hidden="true"></div><p class="muted">Loading…</p></div></main>';
+  }else{
+    header=headerHtml();
+    if(STATE.screen==='people')body=renderPeople();
+    else if(STATE.screen==='person')body=renderPerson();
+    else if(STATE.screen==='log'&&Draft.current)body=renderLog();
+    else if(STATE.screen==='summary')body=renderSummary();
+    else if(STATE.screen==='review')body=renderReview();
+    else if(STATE.screen==='branches')body=renderBranches();
+    else {STATE.screen='people';body=renderPeople();}
+    app.innerHTML=header+'<main class="wrap">'+body+'</main>'+sheetHtml();
+  }
+  if(STATE.nav)window.scrollTo(0,0);else window.scrollTo(0,y);
+  STATE.nav=false;
+}
+function go(fn){STATE.nav=true;fn();render();}
+
+/* ---------- login screen ---------- */
+function renderLogin(){
+  var h='<div class="brandrow" style="padding-top:18px"><span class="brand">Floor Log</span>'+(DEMO?'<span class="tag demo">Sample data</span>':'')+'</div>';
+  h+='<div class="loginCard">';
+  h+='<h2 class="nm2" style="margin-bottom:4px">Log in</h2><p class="muted small">Use the login ID and PIN the owner gave you.</p>';
+  if(STATE.loginError)h+='<div class="errbox" role="alert">'+esc(STATE.loginError)+'</div>';
+  h+='<form data-a="submitLogin"><div class="sec"><label class="lbl" for="loginId">Login ID</label><input id="loginId" type="text" autocomplete="username" autocapitalize="off" autocorrect="off"></div>'+
+    '<div class="sec"><label class="lbl" for="pin">PIN</label><input id="pin" type="password" inputmode="numeric" autocomplete="current-password" minlength="6"></div>'+
+    '<button type="submit" class="btn primary block"'+(STATE.busy?' disabled':'')+'>'+(STATE.busy?'Checking…':'Log in')+'</button></form>';
+  if(DEMO){
+    h+='<div class="sec"><p class="cap">Sample data — jump straight into a role:</p><div class="chips">'+
+      ['owner','manager','trainer1','trainer2','member1'].map(function(id){
+        return '<button type="button" class="chip" data-a="demoLogin" data-id="'+id+'">'+id+'</button>';
+      }).join('')+'</div></div>';
+  }
+  h+='</div>';
+  return h;
+}
+
+/* ---------- exercise picker sheet ---------- */
+function exListHtml(){
+  var q=STATE.query.trim().toLowerCase(),d=Draft.current,have=d?d.exercises.map(function(x){return x.exerciseId;}):[];
+  var list=(STATE.boot.exercises||[]).filter(function(e){
+    if(have.indexOf(e.id)>=0)return false;
+    if(!q)return true;
+    return (e.name+' '+e.muscleGroup+' '+e.equipment+' '+e.aliases).toLowerCase().indexOf(q)>=0;
+  }).sort(function(a,b){return a.name.localeCompare(b.name);}).slice(0,40);
+  var html=list.map(function(e){return '<button type="button" class="pick" data-a="pickEx" data-id="'+e.id+'"><span>'+esc(e.name)+(e.review==='pending'?' <span class="pend">pending</span>':'')+'</span><span class="muted small">'+esc(e.muscleGroup)+' · '+esc(e.equipment)+'</span></button>';}).join('');
+  if(!list.length)html+='<p class="muted pad">No match in the library.</p>';
+  if(q.length>1)html+='<div class="custom"><p class="small">Not in the list? Add “'+esc(STATE.query.trim())+'” as a custom exercise. The owner reviews it before it joins the library.</p><div class="inline"><label class="vh" for="ctype">Logging type</label><select id="ctype">'+
+    [['weight_reps','Weight × reps'],['bodyweight_reps','Bodyweight reps'],['time','Time'],['distance','Distance']].map(function(t){return '<option value="'+t[0]+'">'+t[1]+'</option>';}).join('')+
+    '</select><button type="button" class="btn ghost sm" data-a="addCustomEx">Add custom</button></div></div>';
+  return html;
+}
+function sheetHtml(){
+  if(STATE.sheet==='ex'){
+    return '<div class="sheet-back" data-a="closeSheet"><div class="sheet" role="dialog" aria-label="Add exercise"><div class="sh"><label class="vh" for="exq">Search exercises</label><input id="exq" class="search" type="search" placeholder="Search, e.g. bench, rdl, pull" autocomplete="off" value="'+esc(STATE.query)+'"><button type="button" class="lnk" data-a="closeSheet">Close</button></div><div id="sheetList" class="sl">'+exListHtml()+'</div></div></div>';
+  }
+  if(STATE.sheet==='edit'){
+    var ed=STATE.edit,e=exById(ed.exerciseId);
+    var h=STATE.historyCache[STATE.personId];
+    var edits=(h&&h.setEdits||[]).filter(function(x){return x.setId===ed.setId;});
+    return '<div class="sheet-back" data-a="closeSheet"><div class="sheet" role="dialog" aria-label="Edit set"><div class="sh"><strong>Edit set · '+esc(e.name)+'</strong><button type="button" class="lnk" data-a="closeSheet">Close</button></div><div class="sl pad">'+
+      entryFields('edit',e,ed.vals)+'<p class="muted small">Edits are kept in an audit trail with your name and time.</p>'+
+      (edits.length?'<ul class="plain small">'+edits.map(function(a){
+        var before=JSON.parse(a.beforeJson),after=JSON.parse(a.afterJson);
+        var who=staffById(a.editedBy);
+        return '<li>'+esc(fmtDate(a.editedAt))+' · '+esc(who?who.name:'Staff')+': '+esc(diffText(e,before,after))+'</li>';
+      }).join('')+'</ul>':'')+
+      '<button type="button" class="btn primary block" data-a="saveEdit">Save change</button></div></div></div>';
+  }
+  if(STATE.sheet==='addMember'){
+    var locs=STATE.boot.locations||[];
+    var defaultLoc=role()==='manager'?((STATE.boot.staff.filter(function(s){return s.id===Auth.current.userId;})[0]||{}).locationIds||[])[0]:(locs[0]&&locs[0].id);
+    return '<div class="sheet-back" data-a="closeSheet"><div class="sheet" role="dialog" aria-label="Add member"><div class="sh"><strong>Add member</strong><button type="button" class="lnk" data-a="closeSheet">Close</button></div><div class="sl pad">'+
+      (STATE.sheetError?'<div class="errbox" role="alert">'+esc(STATE.sheetError)+'</div>':'')+
+      '<label class="lbl" for="newMemberName">Name</label><input id="newMemberName" type="text" maxlength="80">'+
+      '<div class="sec"><label class="lbl" for="newMemberLoc">Branch</label><select id="newMemberLoc">'+locs.map(function(l){return '<option value="'+l.id+'"'+(l.id===defaultLoc?' selected':'')+'>'+esc(l.name)+'</option>';}).join('')+'</select></div>'+
+      '<button type="button" class="btn primary block" data-a="saveAddMember">Add member</button></div></div></div>';
+  }
+  return '';
+}
+
+/* ---------- input defaults and steppers ---------- */
+var STEP={weightKg:2.5,reps:1,seconds:5,distanceM:50};
+function lastSessionFor(memberId,exerciseId,h){
+  var sess=(h&&h.sessions||[]).slice().sort(function(a,b){return new Date(a.startedAt)-new Date(b.startedAt);});
+  for(var i=sess.length-1;i>=0;i--){
+    var s=sess[i];
+    if((h.sets||[]).some(function(x){return x.sessionId===s.id&&x.exerciseId===exerciseId;}))return s;
+  }
+  return null;
+}
+function defaultsFor(memberId,exerciseId){
+  var e=exById(exerciseId),d=Draft.current,last=null;
+  var blk=d&&d.exercises.filter(function(x){return x.exerciseId===exerciseId;})[0];
+  if(blk&&blk.sets.length)last=blk.sets[blk.sets.length-1];
+  else{
+    var h=STATE.historyCache[memberId];
+    var ls=h&&lastSessionFor(memberId,exerciseId,h);
+    if(ls){var arr=h.sets.filter(function(s){return s.sessionId===ls.id&&s.exerciseId===exerciseId;});last=arr[arr.length-1];}
+  }
+  if(last)return {weightKg:last.weightKg||0,reps:last.reps||0,seconds:last.seconds||0,distanceM:last.distanceM||0};
+  if(e.logType==='weight_reps')return {weightKg:20,reps:8,seconds:0,distanceM:0};
+  if(e.logType==='bodyweight_reps')return {weightKg:0,reps:8,seconds:0,distanceM:0};
+  if(e.logType==='time')return {weightKg:0,reps:0,seconds:30,distanceM:0};
+  return {weightKg:0,reps:0,seconds:120,distanceM:500};
+}
+function getInput(exerciseId){
+  if(!Draft.current.inputs[exerciseId])Draft.current.inputs[exerciseId]=defaultsFor(Draft.current.memberId,exerciseId);
+  return Draft.current.inputs[exerciseId];
+}
+function vals(scope){return scope==='edit'?STATE.edit.vals:getInput(scope.slice(3));}
+function stepper(scope,k,label,val,unit){
+  var id='f_'+scope.replace(':','_')+'_'+k,st=STEP[k];
+  return '<div class="step"><label class="lbl" for="'+id+'">'+label+'</label><div class="stepc">'+
+    '<button type="button" class="sb" data-a="step" data-scope="'+scope+'" data-k="'+k+'" data-d="'+(-st)+'" aria-label="Decrease '+label+'">−</button>'+
+    '<input id="'+id+'" inputmode="decimal" data-scope="'+scope+'" data-k="'+k+'" value="'+fmtN(val)+'">'+
+    '<button type="button" class="sb" data-a="step" data-scope="'+scope+'" data-k="'+k+'" data-d="'+st+'" aria-label="Increase '+label+'">+</button></div>'+
+    '<span class="unit">'+unit+'</span></div>';
+}
+function entryFields(scope,e,v){
+  if(e.logType==='weight_reps')return '<div class="two">'+stepper(scope,'weightKg','Weight',v.weightKg,'kg')+stepper(scope,'reps','Reps',v.reps,'reps')+'</div>';
+  if(e.logType==='bodyweight_reps')return stepper(scope,'reps','Reps',v.reps,'reps');
+  if(e.logType==='time')return stepper(scope,'seconds','Time',v.seconds,'seconds · '+mmss(v.seconds));
+  return '<div class="two">'+stepper(scope,'distanceM','Distance',v.distanceM,'metres')+stepper(scope,'seconds','Time',v.seconds,'seconds · '+mmss(v.seconds))+'</div>';
+}
+
+/* ---------- history accordion ---------- */
+function historyHtml(memberId,canEdit,h){
+  if(h.loading)return '<div class="center" style="min-height:30vh"><div class="spin" aria-hidden="true"></div></div>';
+  if(h.error)return '<div class="errbox" role="alert">Could not load history: '+esc(h.error)+'. <button type="button" class="lnk" style="color:#fff" data-a="retryHistory" data-id="'+memberId+'">Retry</button></div>';
+  var ss=(h.sessions||[]).slice().sort(function(a,b){return new Date(b.startedAt)-new Date(a.startedAt);});
+  var pr=prMapFor(memberId,h);
+  if(!ss.length)return '<p class="muted">No sessions logged yet.</p>'+(h.stale?'<p class="cap">Showing cached data — you are offline.</p>':'');
+  return (h.stale?'<p class="cap">Showing cached data from your last visit — you are offline.</p>':'')+'<div class="hist">'+ss.map(function(se,i){
+    var sets=(h.sets||[]).filter(function(s){return s.sessionId===se.id&&!s.deletedAt;});
+    var g=groupByEx(sets),tr=staffById(se.trainerId);
+    return '<details'+(i===0?' open':'')+'><summary><span class="hd">'+fmtDate(se.startedAt)+'</span><span class="muted">'+g.length+' exercises · '+Math.round(volumeOf(sets)).toLocaleString('en-SG')+' kg</span></summary><div class="hbody">'+
+      '<p class="muted small">'+esc(locName(se.locationId))+(tr?' · '+esc(tr.name):'')+'</p>'+
+      g.map(function(b){
+        var e=exById(b.exId);if(!e)return '';
+        return '<div class="hex"><div class="hexn">'+esc(e.name)+'</div><ul class="hsets">'+b.sets.map(function(s){
+          return '<li><span>'+esc(fmtSet(e,s))+'</span>'+(pr[s.id]?'<span class="pr">PR</span>':'')+(s.editedAt?'<span class="edt">edited</span>':'')+
+            (canEdit?'<button type="button" class="lnk" data-a="editSet" data-id="'+s.id+'">Edit</button>':'')+'</li>';
+        }).join('')+'</ul></div>';
+      }).join('')+'</div></details>';
+  }).join('')+'</div>';
+}
+
+/* ---------- charts (ported from the POC) ---------- */
+function niceStep(raw){var p=Math.pow(10,Math.floor(Math.log10(raw))),f=raw/p;return (f<=1?1:f<=2?2:f<=5?5:10)*p;}
+function lineChart(pts,label){
+  if(pts.length<2)return '<p class="muted">Log this exercise in at least two sessions to see a trend.</p>';
+  var W=340,H=176,pl=40,pr=14,pt=14,pb=28;
+  var ys=pts.map(function(p){return p.y;}),min=Math.min.apply(0,ys),max=Math.max.apply(0,ys);
+  if(min===max){min-=1;max+=1;}
+  var step=niceStep((max-min)/3),lo=Math.floor(min/step)*step,hi=Math.ceil(max/step)*step;
+  var x0=pts[0].x,x1=pts[pts.length-1].x;
+  var X=function(x){return pl+(x1===x0?0:(x-x0)/(x1-x0))*(W-pl-pr);};
+  var Y=function(y){return pt+(1-(y-lo)/(hi-lo))*(H-pt-pb);};
+  var g='',t;
+  for(t=lo;t<=hi+1e-9;t+=step){g+='<line class="grid" x1="'+pl+'" x2="'+(W-pr)+'" y1="'+Y(t)+'" y2="'+Y(t)+'"/><text class="ax" x="'+(pl-6)+'" y="'+(Y(t)+4)+'" text-anchor="end">'+fmtN(t)+'</text>';}
+  var line=pts.map(function(p,i){return (i?'L':'M')+X(p.x).toFixed(1)+' '+Y(p.y).toFixed(1);}).join(' ');
+  var area=line+' L'+X(x1).toFixed(1)+' '+Y(lo)+' L'+X(x0).toFixed(1)+' '+Y(lo)+' Z';
+  var last=pts[pts.length-1];
+  var dots=pts.map(function(p,i){return i===pts.length-1?'':'<circle class="dot" cx="'+X(p.x).toFixed(1)+'" cy="'+Y(p.y).toFixed(1)+'" r="2.5"/>';}).join('');
+  var lx=X(last.x),anchor=lx>W-50?'end':'middle';
+  return '<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(label)+', latest '+fmtN(last.y)+'">'+g+
+    '<path class="area" d="'+area+'"/><path class="ln" d="'+line+'"/>'+dots+
+    '<circle class="dotL" cx="'+lx.toFixed(1)+'" cy="'+Y(last.y).toFixed(1)+'" r="5"/>'+
+    '<text class="lab" x="'+(lx-(anchor==='end'?2:0)).toFixed(1)+'" y="'+(Y(last.y)-10).toFixed(1)+'" text-anchor="'+anchor+'">'+fmtN(last.y)+'</text>'+
+    '<text class="ax" x="'+pl+'" y="'+(H-8)+'">'+fmtDate(new Date(x0).toISOString()).replace(/^\w+ /,'')+'</text><text class="ax" x="'+(W-pr)+'" y="'+(H-8)+'" text-anchor="end">'+fmtDate(new Date(x1).toISOString()).replace(/^\w+ /,'')+'</text></svg>';
+}
+function barChart(rows){
+  var W=340,H=150,pb=24,pt=22,n=rows.length,bw=(W-20)/n,max=Math.max.apply(0,rows.map(function(r){return r.v;}))||1;
+  var bars=rows.map(function(r,i){
+    var h=(H-pb-pt)*r.v/max,x=10+i*bw+bw*.16,w=bw*.68,y=H-pb-h,d=new Date(r.t),cur=i===n-1;
+    return '<rect class="'+(cur?'barL':'bar')+'" x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+Math.max(h,r.v?1:0).toFixed(1)+'" rx="2"/>'+
+      (r.v?'<text class="'+(cur?'lab':'ax')+'" x="'+(x+w/2).toFixed(1)+'" y="'+(y-5).toFixed(1)+'" text-anchor="middle">'+(r.v>=1000?(r.v/1000).toFixed(1)+'t':Math.round(r.v))+'</text>':'')+
+      '<text class="ax" x="'+(x+w/2).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle">'+d.getDate()+'/'+(d.getMonth()+1)+'</text>';
+  }).join('');
+  return '<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Weekly training volume">'+'<line class="grid" x1="10" x2="'+(W-10)+'" y1="'+(H-pb)+'" y2="'+(H-pb)+'"/>'+bars+'</svg>';
+}
+var METRIC_LABEL={weight_reps:'Estimated 1RM (kg)',bodyweight_reps:'Reps in best set',time:'Hold time (seconds)',distance:'Pace (seconds per 500 m, lower is better)'};
+function displayScore(e,s){
+  if(e.logType==='weight_reps')return Math.round((score('weight_reps',s)||0)*10)/10;
+  if(e.logType==='bodyweight_reps')return s.reps;
+  if(e.logType==='time')return s.seconds;
+  return s.distanceM>0&&s.seconds>0?Math.round(s.seconds/s.distanceM*500):0;
+}
+function progressHtml(memberId,h){
+  var ss=(h.sessions||[]).slice().sort(function(a,b){return new Date(a.startedAt)-new Date(b.startedAt);});
+  var allSets=allSetsFor(memberId,h);
+  var counts={};allSets.forEach(function(s){counts[s.exerciseId]=(counts[s.exerciseId]||0)+1;});
+  var exIds=Object.keys(counts).filter(function(id){return exById(id);}).sort(function(a,b){return counts[b]-counts[a];});
+  if(!exIds.length)return '<p class="muted">No sessions yet.</p>';
+  if(exIds.indexOf(STATE.chartEx)<0)STATE.chartEx=exIds[0];
+  var e=exById(STATE.chartEx);
+  var bySession={};allSets.forEach(function(s){if(s.exerciseId!==e.id)return;(bySession[s.sessionId]=bySession[s.sessionId]||[]).push(s);});
+  var pts=Object.keys(bySession).map(function(sid){
+    var arr=bySession[sid],best=arr.reduce(function(a,s){return (score(e.logType,s)||-Infinity)>(score(e.logType,a)||-Infinity)?s:a;});
+    return {x:best.sessionStartedAt,y:displayScore(e,best)};
+  }).sort(function(a,b){return a.x-b.x;});
+  var h2='<h2>Progress</h2><label class="lbl" for="chartSel">Exercise</label><select id="chartSel" data-change="chartEx">'+exIds.map(function(id){return '<option value="'+id+'"'+(id===e.id?' selected':'')+'>'+esc(exById(id).name)+'</option>';}).join('')+'</select>'+
+    '<p class="cap">'+METRIC_LABEL[e.logType]+'</p>'+lineChart(pts,exById(STATE.chartEx).name+' '+METRIC_LABEL[e.logType]);
+  var now=Date.now(),w0=weekStartMs(now,TZ());
+  var rows=[];for(var i=7;i>=0;i--)rows.push({t:w0-i*7*DAY,v:0});
+  var vol=weeklyVolume(allSets.map(function(s){var ex=exById(s.exerciseId);return Object.assign({},s,{logType:ex?ex.logType:null});}),TZ());
+  rows.forEach(function(r){r.v=vol[r.t]||0;});
+  h2+='<h2>Weekly volume</h2><p class="cap">Total kg lifted, weeks starting Monday</p>'+barChart(rows);
+  var pr=prMapFor(memberId,h);
+  var prs=[];allSets.forEach(function(s){if(pr[s.id]){var ex=exById(s.exerciseId);prs.push({s:s,ex:ex,at:s.sessionStartedAt});}});
+  prs.sort(function(a,b){return b.at-a.at;});prs=prs.slice(0,5);
+  h2+='<h2>Recent personal records</h2>'+(prs.length?'<ul class="plain">'+prs.map(function(p){return '<li><span class="pr">PR</span> '+esc(p.ex.name)+' · '+esc(fmtSet(p.ex,p.s))+' <span class="muted small">'+fmtDate(new Date(p.at).toISOString())+'</span></li>';}).join('')+'</ul>':'<p class="muted">None yet.</p>');
+  return h2;
+}
+
+/* ---------- people (list) screen ---------- */
+function visibleMembers(){return (STATE.boot.members||[]).slice();}
+function trainerNameFor(memberId){
+  var a=(STATE.boot.assignments||[]).filter(function(x){return x.memberId===memberId&&x.active;})[0];
+  if(!a)return null;var s=staffById(a.trainerId);return s?s.name:a.trainerId;
+}
+function needsAttentionHtml(){
+  var list=Queue.needsAttentionList();
+  if(!list.length)return '';
+  return '<div class="sec">'+list.map(function(n){
+    return '<div class="needs"><div class="inline" style="justify-content:space-between"><span class="nm">'+esc(n.type)+' failed</span>'+
+      '<button type="button" class="lnk" data-a="dismissNeeds" data-id="'+n.opId+'">Dismiss</button></div>'+
+      '<p class="muted small" style="margin:2px 0 0">'+esc(n.error)+' — '+fmtDate(new Date(n.at).toISOString())+'</p></div>';
+  }).join('')+'</div>';
+}
+function renderPeople(){
+  var h=needsAttentionHtml();
+  if(Draft.current){
+    var dm=memberById(Draft.current.memberId);
+    h+='<div class="banner"><div><strong>Session in progress</strong><br><span class="muted">'+esc(dm?dm.name:'')+' · started '+fmtTime(Draft.current.startedAt)+'</span></div><button type="button" class="btn primary sm" data-a="resume">Resume</button></div>';
+  }
+  var canAdd=role()==='owner'||role()==='manager'||role()==='trainer';
+  var members=visibleMembers();
+  if(role()==='trainer'){
+    members=members.filter(function(m){return trainerIsSelf(m.id);});
+  }
+  members.sort(function(a,b){return a.name.localeCompare(b.name);});
+  h+='<div class="sec inline" style="justify-content:space-between"><h2 style="margin:0">'+(role()==='trainer'?'Your clients':'Members')+'</h2>'+
+    (canAdd?'<button type="button" class="btn ghost sm" data-a="openAddMember">+ Add member</button>':'')+'</div>';
+  if(!members.length){h+='<div class="empty"><p><strong>Nothing here yet.</strong></p><p class="muted">'+(role()==='trainer'?'Ask the owner or a manager to assign you a client.':'Add a member to get started.')+'</p></div>';}
+  h+='<ul class="list">'+members.map(function(m){
+    var tn=trainerNameFor(m.id);
+    var assignCtl='';
+    if(role()==='owner'||role()==='manager'){
+      var trainers=(STATE.boot.staff||[]).filter(function(s){return s.role==='trainer'&&s.active&&s.locationIds.indexOf(m.homeLocationId)>=0;});
+      assignCtl='<div class="revr" style="margin-top:8px"><label class="vh" for="asg_'+m.id+'">Assign trainer</label><select id="asg_'+m.id+'" data-a="noop">'+
+        '<option value="">Unassigned</option>'+trainers.map(function(t){return '<option value="'+t.id+'"'+(tn===t.name?' selected':'')+'>'+esc(t.name)+'</option>';}).join('')+
+        '</select><button type="button" class="btn ghost sm" data-a="assignTrainer" data-id="'+m.id+'">Set</button></div>';
+    }
+    return '<li><button type="button" class="item" data-a="openPerson" data-id="'+m.id+'" style="align-items:flex-start"><span class="av">'+esc(initials(m.name))+'</span><span class="grow"><span class="nm">'+esc(m.name)+'</span><span class="sub">'+esc(locName(m.homeLocationId))+(tn?' · '+esc(tn):' · Unassigned')+'</span></span>'+pill(m)+'<span class="chev" aria-hidden="true">›</span></button>'+
+      (role()!=='trainer'?assignCtl:'')+'</li>';
+  }).join('')+'</ul>';
+  return h;
+}
+function trainerIsSelf(memberId){
+  return (STATE.boot.assignments||[]).some(function(a){return a.memberId===memberId&&a.trainerId===Auth.current.userId&&a.active;});
+}
+
+/* ---------- person (detail + progress) screen ---------- */
+function renderPerson(){
+  var id=STATE.personId,m=memberById(id)||(kind()==='member'?{id:id,name:Auth.current.name,homeLocationId:'',status:'active'}:null);
+  if(!m)return '<p class="muted">Not found.</p>';
+  var h=STATE.historyCache[id];
+  if(!h){withHistory(id,function(){});h={loading:true};}
+  var canStaffView=kind()==='staff';
+  var h1='';
+  if(canStaffView)h1+='<button type="button" class="back" data-a="back">‹ '+(role()==='trainer'?'Clients':'Members')+'</button>';
+  h1+='<div class="who"><span class="av lg">'+esc(initials(m.name))+'</span><div class="grow"><h2 class="nm2">'+esc(m.name)+'</h2><span class="muted">'+(m.homeLocationId?esc(locName(m.homeLocationId))+' · ':'')+((h.sessions||[]).length)+' sessions</span></div>'+(canStaffView?pill(m):'')+'</div>';
+
+  if(canStaffView){
+    var resuming=Draft.current&&Draft.current.memberId===id;
+    var canStart=canStartSessionFor(m);
+    if(Draft.current&&!resuming)h1+='<p class="note">A session with another client is still open. Finish or discard it first.</p>';
+    else if(canStart)h1+='<button type="button" class="btn primary block" data-a="'+(resuming?'resume':'startSession')+'">'+(resuming?'Resume session':'Start session')+'</button>';
+    if(role()==='owner'||role()==='manager'){
+      h1+='<div class="sec"><button type="button" class="btn ghost sm" data-a="toggleStatus" data-id="'+id+'">Mark as '+(m.status==='active'?'expired':'active')+'</button><span class="muted small"> Membership status is set by hand.</span></div>';
+    }
+  }
+
+  var body=canStaffView?h1:h1;
+  if(!h.loading&&!h.error){body+=progressHtml(id,h);}
+  body+='<h2>History</h2>'+historyHtml(id,canEditFor(m,h),h);
+  return body;
+}
+function canStartSessionFor(m){
+  if(role()==='owner')return true;
+  if(role()==='manager')return (STATE.boot.staff.filter(function(s){return s.id===Auth.current.userId;})[0]||{}).locationIds.indexOf(m.homeLocationId)>=0;
+  if(role()==='trainer')return trainerIsSelf(m.id);
+  return false;
+}
+function canEditFor(m,h){
+  if(kind()!=='staff')return false;
+  if(role()==='owner'||role()==='manager')return true;
+  // trainer: only sets inside sessions they themselves created.
+  return true; // UI affordance; server/demo backend re-checks per-set on save.
+}
+
+/* ---------- log (active session) screen ---------- */
+function lastLine(memberId,exerciseId){
+  var h=STATE.historyCache[memberId];
+  var ls=h&&lastSessionFor(memberId,exerciseId,h);
+  if(!ls)return '<p class="last">First time logging this exercise.</p>';
+  var e=exById(exerciseId),sets=h.sets.filter(function(s){return s.sessionId===ls.id&&s.exerciseId===exerciseId;});
+  return '<p class="last">Last time · '+fmtDate(ls.startedAt)+': '+esc(compact(e,sets))+'</p>';
+}
+function renderLog(){
+  var d=Draft.current,m=memberById(d.memberId)||{name:'Member'};
+  var h=STATE.historyCache[d.memberId]||{sessions:[],sets:[]};
+  var pr=prMapFor(d.memberId,h);
+  var nsets=d.exercises.reduce(function(a,b){return a+b.sets.length;},0);
+  var vol=Math.round(d.exercises.reduce(function(a,b){return a+volumeOf(b.sets.map(function(s){return {exerciseId:b.exerciseId,weightKg:s.weightKg,reps:s.reps};}));},0));
+  var out='<button type="button" class="back" data-a="leaveLog">‹ '+esc(m.name)+'</button>'+
+    '<div class="logHead"><h2 class="nm2">Session</h2><span class="muted">Started '+fmtTime(d.startedAt)+' · '+nsets+' sets · '+vol.toLocaleString('en-SG')+' kg</span></div>';
+  if(!d.exercises.length){
+    var prevSessions=(h.sessions||[]).slice().sort(function(a,b){return new Date(a.startedAt)-new Date(b.startedAt);});
+    var prev=prevSessions.length?prevSessions[prevSessions.length-1]:null;
+    out+='<div class="empty"><p><strong>Nothing logged yet.</strong></p><p class="muted">Add the first exercise'+(prev?', or start from '+esc(m.name.split(' ')[0])+'’s last session.':'.')+'</p>'+
+      (prev?'<button type="button" class="btn ghost block" data-a="copyLast">Copy last session ('+fmtDate(prev.startedAt)+')</button>':'')+'</div>';
+  }
+  d.exercises.forEach(function(blk){
+    var e=exById(blk.exerciseId),v=getInput(blk.exerciseId);
+    out+='<section class="ex"><div class="exh"><h3>'+esc(e.name)+'</h3><span class="muted small">'+esc(e.muscleGroup)+' · '+esc(e.equipment)+(e.review==='pending'?' · <span class="pend">pending review</span>':'')+'</span></div>'+
+      lastLine(d.memberId,blk.exerciseId);
+    if(blk.sets.length)out+='<ol class="sets">'+blk.sets.map(function(s){
+      return '<li><span class="sn"></span><span class="sv">'+esc(fmtSet(e,s))+'</span>'+(pr[s.id]?'<span class="pr">PR</span>':'')+
+        '<button type="button" class="lnk" data-a="delSet" data-ex="'+blk.exerciseId+'" data-id="'+s.id+'" aria-label="Remove set">Remove</button></li>';
+    }).join('')+'</ol>';
+    out+='<div class="entry">'+entryFields('in:'+blk.exerciseId,e,v)+'<button type="button" class="btn primary block" data-a="logSet" data-ex="'+blk.exerciseId+'">Log set '+(blk.sets.length+1)+'</button></div></section>';
+  });
+  out+='<div class="bar"><div>'+(STATE.confirmDiscard
+    ?'<button type="button" class="btn danger grow" data-a="discardYes">Discard session</button><button type="button" class="btn ghost" data-a="discardNo">Keep</button>'
+    :'<button type="button" class="btn ghost" data-a="discard">Discard</button><button type="button" class="btn ghost grow" data-a="openSheet">+ Exercise</button><button type="button" class="btn primary grow" data-a="finish">Finish</button>')+'</div></div>';
+  return out;
+}
+
+/* ---------- summary screen ---------- */
+function renderSummary(){
+  var d=STATE.lastSummary;if(!d)return '<p class="muted">No session.</p>';
+  var m=memberById(d.memberId)||{name:'Member'};
+  var g=groupByEx(d.sets);
+  var out='<div class="done"><span class="muted">Saved</span><h2 class="nm2">'+esc(m.name)+'</h2><p class="muted">'+fmtDate(d.startedAt)+' · '+g.length+' exercises · '+d.sets.length+' sets · '+Math.round(volumeOf(d.sets)).toLocaleString('en-SG')+' kg</p></div>';
+  if(d.prs.length)out+='<h2>New personal records</h2><ul class="plain">'+d.prs.map(function(s){var e=exById(s.exerciseId);return '<li><span class="pr">PR</span> '+esc(e.name)+' · '+esc(fmtSet(e,s))+'</li>';}).join('')+'</ul>';
+  else out+='<p class="muted">No new personal records this session.</p>';
+  out+='<div class="stack"><button type="button" class="btn primary block" data-a="backToPerson" data-id="'+m.id+'">Back to '+esc(m.name.split(' ')[0])+'’s profile</button><button type="button" class="btn ghost block" data-a="toPeople">Back to '+(role()==='trainer'?'clients':'members')+'</button></div>';
+  return out;
+}
+
+/* ---------- review queue (owner, manager) ---------- */
+function renderReview(){
+  var pend=(STATE.boot.exercises||[]).filter(function(e){return e.review==='pending';});
+  var lib=(STATE.boot.exercises||[]).filter(function(e){return e.review==='approved';});
+  var h='<h2>Exercise review queue</h2><p class="cap">Custom exercises staff add on the floor. Merge duplicates so progress charts stay clean.</p>';
+  if(!pend.length){h+='<p class="muted">Nothing waiting.</p>';return h;}
+  h+='<ul class="list">'+pend.map(function(e){
+    var creator=staffById(e.createdBy);
+    var mine=e.createdBy===Auth.current.userId;
+    return '<li class="rev"><div class="nm">'+esc(e.name)+'</div><div class="sub">'+(e.logType||'').replace('_',' ')+' · added by '+esc(creator?creator.name:'a staff member')+(mine?' (you)':'')+'</div>'+
+      (mine?'<p class="muted small">You cannot approve or merge your own submission.</p>':
+      '<div class="revr"><button type="button" class="btn ghost sm" data-a="approveEx" data-id="'+e.id+'">Approve as new</button>'+
+      '<label class="vh" for="mg_'+e.id+'">Merge into</label><select id="mg_'+e.id+'">'+lib.filter(function(x){return x.logType===e.logType;}).map(function(x){return '<option value="'+x.id+'">'+esc(x.name)+'</option>';}).join('')+'</select>'+
+      '<button type="button" class="btn primary sm" data-a="mergeEx" data-id="'+e.id+'">Merge</button></div>')+'</li>';
+  }).join('')+'</ul>';
+  return h;
+}
+
+function queueManagementAction(type,payload){
+  payload=Object.assign({id:uuid()},payload);
+  return Queue.enqueue(type,payload).then(function(){Queue.flush();});
+}
+
+/* ---------- branches (owner) ---------- */
+function startDraft(memberId){
+  var m=memberById(memberId);
+  Draft.current={id:uuid(),memberId:memberId,trainerId:Auth.current.userId,locationId:m.homeLocationId,startedAt:new Date().toISOString(),exercises:[],inputs:{}};
+  Draft.save();
+}
+function addToDraft(exerciseId){if(!Draft.current.exercises.some(function(b){return b.exerciseId===exerciseId;}))Draft.current.exercises.push({exerciseId:exerciseId,sets:[]});}
+
+function renderBranches(){
+  var h='<h2>Branches</h2><ul class="list">'+(STATE.boot.locations||[]).map(function(l){
+    var staffHere=(STATE.boot.staff||[]).filter(function(s){return s.locationIds.indexOf(l.id)>=0&&s.role==='trainer';});
+    var membersHere=(STATE.boot.members||[]).filter(function(m){return m.homeLocationId===l.id;});
+    var activeHere=membersHere.filter(function(m){return m.status==='active';});
+    return '<li class="loc"><div><div class="nm">'+esc(l.name)+'</div><div class="sub">'+(staffHere.length?esc(staffHere.map(function(s){return s.name;}).join(', ')):'No trainers set up yet')+'</div></div><div class="locn">'+
+      '<span><b>'+activeHere.length+'</b> active members</span><span><b>'+membersHere.length+'</b> total</span></div></li>';
+  }).join('')+'</ul>';
+  return h;
+}
+
+/* ============================================================ actions ============================================================ */
+function queueHasItems(){return Queue.list().then(function(l){return l.length>0;});}
+function confirmIfQueued(message){
+  return queueHasItems().then(function(has){
+    if(!has)return true;
+    return window.confirm(message+' You have unsynced changes that will be lost from this device if you continue.');
+  });
+}
+
+var A={
+  noop:function(){},
+  section:function(el){STATE.screen=el.dataset.id;STATE.section=el.dataset.id;STATE.nav=true;},
+  openPerson:function(el){STATE.personId=el.dataset.id;STATE.screen='person';STATE.chartEx=null;STATE.nav=true;withHistory(el.dataset.id,function(){});},
+  back:function(){STATE.screen='people';STATE.nav=true;},
+  toPeople:function(){STATE.screen='people';STATE.nav=true;},
+  backToPerson:function(el){STATE.personId=el.dataset.id;STATE.screen='person';STATE.nav=true;withHistory(el.dataset.id,function(){});},
+  retryHistory:function(el){delete STATE.historyCache[el.dataset.id];withHistory(el.dataset.id,function(){});},
+
+  openAddMember:function(){STATE.sheet='addMember';STATE.sheetError=null;},
+  saveAddMember:function(){
+    var name=document.getElementById('newMemberName').value.trim();
+    var locId=document.getElementById('newMemberLoc').value;
+    if(!name){STATE.sheetError='Enter a name.';return;}
+    var id=uuid();
+    STATE.boot.members.push({id:id,name:name,homeLocationId:locId,status:'active'});
+    STATE.sheet=null;STATE.nav=false;
+    queueManagementAction('addMember',{name:name,homeLocationId:locId,id:id});
+  },
+  toggleStatus:function(el){
+    var m=memberById(el.dataset.id);if(!m)return;
+    m.status=m.status==='active'?'expired':'active';
+    queueManagementAction('setMemberStatus',{memberId:m.id,status:m.status});
+  },
+  assignTrainer:function(el){
+    var memberId=el.dataset.id,sel=document.getElementById('asg_'+memberId);
+    var trainerId=sel&&sel.value;
+    if(!trainerId)return;
+    STATE.boot.assignments=(STATE.boot.assignments||[]).filter(function(a){return a.memberId!==memberId;});
+    STATE.boot.assignments.push({trainerId:trainerId,memberId:memberId,active:true,since:new Date().toISOString().slice(0,10)});
+    queueManagementAction('assignClient',{memberId:memberId,trainerId:trainerId});
+  },
+
+  startSession:function(){
+    startDraft(STATE.personId);
+    queueManagementAction('createSession',{id:Draft.current.id,memberId:Draft.current.memberId,trainerId:Draft.current.trainerId,locationId:Draft.current.locationId,startedAt:Draft.current.startedAt});
+    STATE.screen='log';STATE.nav=true;
+  },
+  resume:function(){STATE.personId=Draft.current.memberId;STATE.screen='log';STATE.nav=true;},
+  leaveLog:function(){STATE.screen='person';STATE.confirmDiscard=false;STATE.nav=true;},
+  copyLast:function(){
+    var h=STATE.historyCache[Draft.current.memberId];
+    var prevSessions=(h.sessions||[]).slice().sort(function(a,b){return new Date(a.startedAt)-new Date(b.startedAt);});
+    var prev=prevSessions[prevSessions.length-1];if(!prev)return;
+    var prevSets=h.sets.filter(function(s){return s.sessionId===prev.id;});
+    groupByEx(prevSets).forEach(function(g){addToDraft(g.exId);});
+    Draft.save();
+  },
+  openSheet:function(){STATE.sheet='ex';STATE.query='';},
+  closeSheet:function(el,ev){if(ev&&ev.target!==el&&el.classList.contains('sheet-back'))return false;STATE.sheet=null;STATE.edit=null;STATE.sheetError=null;},
+  pickEx:function(el){addToDraft(el.dataset.id);STATE.sheet=null;Draft.save();},
+  addCustomEx:function(){
+    var name=STATE.query.trim(),logType=document.getElementById('ctype').value,id=uuid();
+    var exercise={id:id,name:sanitizeText(name,80),muscleGroup:'Other',equipment:'Other',logType:logType,aliases:'',review:'pending',createdBy:Auth.current.userId,mergedInto:''};
+    STATE.boot.exercises.push(exercise);
+    addToDraft(id);STATE.sheet=null;Draft.save();
+    queueManagementAction('addCustomExercise',{id:id,name:name,logType:logType});
+  },
+  step:function(el){var v=vals(el.dataset.scope),k=el.dataset.k;v[k]=Math.max(0,Math.round((v[k]+parseFloat(el.dataset.d))*100)/100);Draft.save();},
+  logSet:function(el){
+    var exerciseId=el.dataset.ex,e=exById(exerciseId),v=getInput(exerciseId),valid=true;
+    var check=validateSetFields(e.logType,{weightKg:e.logType==='weight_reps'?v.weightKg:null,reps:(e.logType==='weight_reps'||e.logType==='bodyweight_reps')?v.reps:null,seconds:(e.logType==='time'||e.logType==='distance')?v.seconds:null,distanceM:e.logType==='distance'?v.distanceM:null});
+    if(e.logType==='weight_reps'&&!(v.reps>0))valid=false;
+    if(e.logType==='bodyweight_reps'&&!(v.reps>0))valid=false;
+    if(e.logType==='time'&&!(v.seconds>0))valid=false;
+    if(e.logType==='distance'&&!(v.distanceM>0&&v.seconds>0))valid=false;
+    if(!valid||!check.ok)return;
+    var id=uuid();
+    var set={id:id,weightKg:e.logType==='weight_reps'?v.weightKg:null,reps:(e.logType==='weight_reps'||e.logType==='bodyweight_reps')?v.reps:null,seconds:(e.logType==='time'||e.logType==='distance')?v.seconds:null,distanceM:e.logType==='distance'?v.distanceM:null};
+    Draft.current.exercises.filter(function(b){return b.exerciseId===exerciseId;})[0].sets.push(set);
+    Draft.save();
+    var position=Draft.current.exercises.reduce(function(a,b){return a+b.sets.length;},0);
+    queueManagementAction('addSet',Object.assign({id:id,sessionId:Draft.current.id,exerciseId:exerciseId,position:position},set));
+  },
+  delSet:function(el){
+    var b=Draft.current.exercises.filter(function(x){return x.exerciseId===el.dataset.ex;})[0];
+    b.sets=b.sets.filter(function(s){return s.id!==el.dataset.id;});
+    Draft.save();
+    Queue.remove(el.dataset.id);
+  },
+  discard:function(){STATE.confirmDiscard=true;},
+  discardNo:function(){STATE.confirmDiscard=false;},
+  discardYes:function(){
+    var memberId=Draft.current.memberId;
+    Draft.clear();STATE.confirmDiscard=false;STATE.personId=memberId;STATE.screen='person';STATE.nav=true;
+  },
+  finish:function(){
+    var d=Draft.current,sets=[];
+    d.exercises.forEach(function(b){b.sets.forEach(function(s){sets.push(Object.assign({exerciseId:b.exerciseId},s));});});
+    var pr=prMapFor(d.memberId,STATE.historyCache[d.memberId]||{sessions:[],sets:[]});
+    var prSets=sets.filter(function(s){return pr[s.id];});
+    STATE.lastSummary={memberId:d.memberId,startedAt:d.startedAt,sets:sets,prs:prSets};
+    queueManagementAction('finishSession',{id:d.id,endedAt:new Date().toISOString()});
+    Draft.clear();STATE.screen='summary';STATE.nav=true;
+    delete STATE.historyCache[STATE.lastSummary.memberId]; // force a fresh fetch next time it's opened
+  },
+
+  editSet:function(el){
+    var h=STATE.historyCache[STATE.personId],st=byId(h.sets,el.dataset.id);
+    STATE.edit={sessionId:st.sessionId,setId:st.id,exerciseId:st.exerciseId,vals:{weightKg:st.weightKg||0,reps:st.reps||0,seconds:st.seconds||0,distanceM:st.distanceM||0}};
+    STATE.sheet='edit';
+  },
+  saveEdit:function(){
+    var ed=STATE.edit;
+    queueManagementAction('editSet',Object.assign({id:ed.setId},ed.vals));
+    var h=STATE.historyCache[STATE.personId],st=byId(h.sets,ed.setId);
+    if(st){st.weightKg=ed.vals.weightKg;st.reps=ed.vals.reps;st.seconds=ed.vals.seconds;st.distanceM=ed.vals.distanceM;st.editedAt=new Date().toISOString();}
+    STATE.sheet=null;STATE.edit=null;
+  },
+
+  approveEx:function(el){
+    var e=byId(STATE.boot.exercises,el.dataset.id);if(e)e.review='approved';
+    queueManagementAction('approveExercise',{exerciseId:el.dataset.id});
+  },
+  mergeEx:function(el){
+    var dupId=el.dataset.id,sel=document.getElementById('mg_'+dupId),keepId=sel&&sel.value;
+    if(!keepId)return;
+    STATE.boot.sets&&STATE.boot.sets.forEach(function(s){if(s.exerciseId===dupId)s.exerciseId=keepId;});
+    var dup=byId(STATE.boot.exercises,dupId);if(dup){dup.mergedInto=keepId;dup.review='approved';}
+    queueManagementAction('mergeExercise',{dupId:dupId,keepId:keepId});
+  },
+
+  demoLogin:function(el){
+    var loginId=el.dataset.id,pin=DemoApi.PINS[loginId];
+    doLogin(loginId,pin);
+  },
+  submitLogin:function(el,ev){
+    ev.preventDefault();
+    var loginId=document.getElementById('loginId').value.trim();
+    var pin=document.getElementById('pin').value.trim();
+    doLogin(loginId,pin);
+    return false;
+  },
+  logout:function(){
+    confirmIfQueued('Log out now?').then(function(proceed){
+      if(!proceed)return;
+      Auth.clear();Draft.clear();STATE.boot=null;STATE.historyCache={};STATE.screen='login';STATE.nav=true;render();
+    });
+    return false;
+  },
+  resetDemo:function(){DemoApi.resetSeed();location.reload();},
+  dismissNeeds:function(el){Queue.clearNeedsAttention(el.dataset.id);}
+};
+
+function doLogin(loginId,pin){
+  STATE.busy=true;STATE.loginError=null;render();
+  Api.login(loginId,pin).then(function(res){
+    STATE.busy=false;
+    if(res.ok){
+      Auth.save(res.data);
+      loadBootstrap(false);
+    }else{
+      STATE.loginError=res.error==='locked_out'?'Too many attempts — try again in 15 minutes.':
+        res.error==='invalid_credentials'?'Wrong login ID or PIN.':
+        res._network?'Cannot reach the server. Check your connection.':'Could not log in: '+res.error;
+      render();
+    }
+  });
+}
+
+document.addEventListener('click',function(ev){
+  var el=ev.target.closest('[data-a]');if(!el)return;
+  var f=A[el.dataset.a];if(!f)return;
+  if(f(el,ev)===false)return;
+  render();
+});
+document.addEventListener('submit',function(ev){
+  var el=ev.target.closest('[data-a]');if(!el)return;
+  var f=A[el.dataset.a];if(!f)return;
+  ev.preventDefault();
+  if(f(el,ev)===false)return;
+  render();
+});
+document.addEventListener('change',function(ev){
+  var el=ev.target.closest('[data-change]');if(!el)return;
+  var k=el.dataset.change;
+  if(k==='chartEx'){STATE.chartEx=el.value;STATE.nav=false;}
+  render();
+});
+document.addEventListener('input',function(ev){
+  var t=ev.target;
+  if(t.id==='exq'){STATE.query=t.value;var l=document.getElementById('sheetList');if(l)l.innerHTML=exListHtml();return;}
+  if(t.dataset&&t.dataset.scope){var v=vals(t.dataset.scope);v[t.dataset.k]=Math.max(0,parseFloat(t.value)||0);if(t.dataset.scope!=='edit')Draft.save();}
+});
+window.addEventListener('beforeunload',function(ev){
+  if(STATE.queueStatus&&STATE.queueStatus.count>0){ev.preventDefault();ev.returnValue='';}
+});
+
+/* ---------- service worker (installability + app-shell cache) ---------- */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
+
+boot();
+})();
+</script>
+</body>
+</html>
+

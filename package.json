@@ -1,0 +1,9 @@
+{
+  "name": "floorlog-frontend-tests",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Node tests for the Floor Log front end's offline queue (suite 5). No dependencies — uses Node's built-in test runner. UI tests (suite 6) run separately with Playwright.",
+  "scripts": {
+    "test": "node --test test/queue.test.js"
+  }
+}
