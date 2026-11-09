@@ -100,31 +100,43 @@
       flushing = true; notify();
       return list().then(function (items) {
         if (!items.length) { flushing = false; backoffMs = minBackoff; notify(); return; }
-        var syncItems = items.filter(function (i) { return SYNC_OP_TYPES[i.type]; });
-        var mgmtItems = items.filter(function (i) { return MGMT_ACTIONS[i.type]; });
+        // Grouped into consecutive same-category runs, preserving enqueue
+        // order — a management action must finish before a later sync op
+        // that may depend on it (e.g. addMember before that member's
+        // createSession), while consecutive sync ops still batch into one
+        // network call. Sending every sync op ahead of every management
+        // action regardless of order used to cause exactly that: a session
+        // created right after adding its member, queued together (offline,
+        // or just two fast taps), would have its createSession rejected as
+        // a permanent "member not found" because it was sent before the
+        // addMember that creates the member.
+        var runs = groupIntoRuns(items);
         var chain = Promise.resolve();
         var anyTransient = false;
 
-        if (syncItems.length) {
-          chain = chain.then(function () {
-            var ops = syncItems.map(function (i) { return Object.assign({ type: i.type, opId: i.opId }, i.payload); });
-            return api.sync(ops).then(function (res) {
-              var plan = classifySyncResults(syncItems, res);
-              plan.toAttention.forEach(pushNeedsAttention);
-              if (plan.toRetry.length) anyTransient = true;
-              return Promise.all(plan.toRemove.map(function (i) { return remove(i.opId); }));
+        runs.forEach(function (run) {
+          if (run.isSync) {
+            chain = chain.then(function () {
+              var ops = run.items.map(function (i) { return Object.assign({ type: i.type, opId: i.opId }, i.payload); });
+              return api.sync(ops).then(function (res) {
+                var plan = classifySyncResults(run.items, res);
+                plan.toAttention.forEach(pushNeedsAttention);
+                if (plan.toRetry.length) anyTransient = true;
+                return Promise.all(plan.toRemove.map(function (i) { return remove(i.opId); }));
+              });
             });
-          });
-        }
-        mgmtItems.forEach(function (i) {
-          chain = chain.then(function () {
-            return api[i.type](i.payload).then(function (res) {
-              var plan = classifyMgmtResult(i, res);
-              if (plan.action === 'remove') return remove(i.opId);
-              if (plan.action === 'attention') { pushNeedsAttention(plan.entry); return remove(i.opId); }
-              anyTransient = true;
+          } else {
+            run.items.forEach(function (i) {
+              chain = chain.then(function () {
+                return api[i.type](i.payload).then(function (res) {
+                  var plan = classifyMgmtResult(i, res);
+                  if (plan.action === 'remove') return remove(i.opId);
+                  if (plan.action === 'attention') { pushNeedsAttention(plan.entry); return remove(i.opId); }
+                  anyTransient = true;
+                });
+              });
             });
-          });
+          }
         });
 
         return chain.then(function () {
@@ -153,9 +165,20 @@
     };
   }
 
+  function groupIntoRuns(items) {
+    var runs = [];
+    items.forEach(function (item) {
+      var isSync = !!SYNC_OP_TYPES[item.type];
+      var last = runs[runs.length - 1];
+      if (last && last.isSync === isSync) last.items.push(item);
+      else runs.push({ isSync: isSync, items: [item] });
+    });
+    return runs;
+  }
+
   return {
     SYNC_OP_TYPES: SYNC_OP_TYPES, MGMT_ACTIONS: MGMT_ACTIONS,
     isPermanent: isPermanent, classifySyncResults: classifySyncResults, classifyMgmtResult: classifyMgmtResult,
-    createQueue: createQueue
+    groupIntoRuns: groupIntoRuns, createQueue: createQueue
   };
 });

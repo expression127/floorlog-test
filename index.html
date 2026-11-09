@@ -55,6 +55,8 @@ p{margin:0 0 10px}
 .grow{flex:1;min-width:0;display:flex;flex-direction:column}
 select,.search,input[type=text],input[type=password],input[type=tel]{width:100%;max-width:100%;background:var(--raised);border:1px solid var(--line);border-radius:8px;padding:12px;min-height:48px}
 .inline select{width:auto;flex:1;min-width:140px}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 0}
+.filters select{flex:1 1 112px;min-width:112px;width:auto}
 .btn{border:1px solid var(--line);background:var(--raised);border-radius:10px;padding:14px 16px;font-weight:600;min-height:52px}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .btn.ghost{background:transparent}
@@ -525,6 +527,10 @@ var DemoApi=(function(){
 
   function doAddMember(actor,body){
     if(!canAddMember(actor,body.homeLocationId))return err('forbidden',403);
+    if(body.id){
+      var existing=byId(D.members,body.id);
+      if(existing)return ok(Object.assign(publicMember(existing),{assignedTrainerId:null,duplicate:true}));
+    }
     var name=sanitizeText(body.name,80);
     if(!name)return err('missing_name',400);
     var member={id:body.id||uuid(),name:name,homeLocationId:body.homeLocationId,status:'active'};
@@ -551,6 +557,8 @@ var DemoApi=(function(){
     if(!canAssignClient(actor,member))return err('forbidden',403);
     var trainer=byId(D.staff,body.trainerId);
     if(!trainer||trainer.role!=='trainer'||!trainer.active)return err('bad_trainer',400);
+    D.assignments.filter(function(a){return a.memberId===body.memberId&&a.trainerId!==body.trainerId&&a.active;})
+      .forEach(function(a){a.active=false;});
     var existing=D.assignments.filter(function(a){return a.trainerId===body.trainerId&&a.memberId===body.memberId;})[0];
     if(existing)existing.active=true;
     else D.assignments.push({trainerId:body.trainerId,memberId:body.memberId,active:true,since:new Date().toISOString().slice(0,10)});
@@ -587,6 +595,8 @@ var DemoApi=(function(){
       if(op.programmeId){
         var programme=byId(D.programmes,op.programmeId);
         if(!programme)return {ok:false,error:'bad_programme',code:400};
+        var usedOnOwn=actor.kind==='member'&&D.sessions.some(function(s){return s.memberId===actor.memberId&&s.programmeId===programme.id;});
+        if(!canSeeProgramme(actor,programme,usedOnOwn))return {ok:false,error:'forbidden',code:403};
         programmeId=programme.id;
       }
       D.sessions.push({id:op.id,memberId:op.memberId,trainerId:trainerId,locationId:op.locationId,programmeId:programmeId,startedAt:op.startedAt||new Date().toISOString(),endedAt:null,notes:sanitizeText(op.notes,500),createdAt:new Date().toISOString()});
@@ -767,7 +777,8 @@ var Draft={
 var STATE={
   screen:'boot',bootError:null,boot:null,personId:null,lastSessionId:null,
   historyCache:{},sheet:null,query:'',chartEx:null,confirmDiscard:false,nav:true,
-  queueStatus:{state:'synced',count:0},section:null,loginError:null,busy:false
+  queueStatus:{state:'synced',count:0},section:null,loginError:null,busy:false,
+  peopleFilters:{status:'all',locationId:'all',trainerId:'all'}
 };
 
 function exById(id){return byId(STATE.boot&&STATE.boot.exercises,id);}
@@ -1186,6 +1197,39 @@ function needsAttentionHtml(){
       '<p class="muted small" style="margin:2px 0 0">'+esc(n.error)+' — '+fmtDate(new Date(n.at).toISOString())+'</p></div>';
   }).join('')+'</div>';
 }
+function peopleFiltersHtml(baseMembers){
+  if(!baseMembers.length)return '';
+  var f=STATE.peopleFilters;
+  var locIds=[];baseMembers.forEach(function(m){if(locIds.indexOf(m.homeLocationId)<0)locIds.push(m.homeLocationId);});
+  var showLocation=locIds.length>1;
+  var showTrainer=role()==='owner'||role()==='manager';
+  var trainerIds=[];
+  if(showTrainer){
+    baseMembers.forEach(function(m){var tid=trainerIdFor(m.id);if(tid&&trainerIds.indexOf(tid)<0)trainerIds.push(tid);});
+  }
+  if(!showLocation&&!showTrainer&&baseMembers.every(function(m){return m.status==='active';}))return ''; // nothing meaningful to filter
+  var out='<div class="filters">';
+  out+='<label class="vh" for="filterStatus">Filter by status</label><select id="filterStatus" data-change="filterStatus">'+
+    '<option value="all"'+(f.status==='all'?' selected':'')+'>All statuses</option>'+
+    '<option value="active"'+(f.status==='active'?' selected':'')+'>Active</option>'+
+    '<option value="expired"'+(f.status==='expired'?' selected':'')+'>Expired</option>'+
+    '</select>';
+  if(showLocation){
+    out+='<label class="vh" for="filterLocation">Filter by branch</label><select id="filterLocation" data-change="filterLocation">'+
+      '<option value="all"'+(f.locationId==='all'?' selected':'')+'>All branches</option>'+
+      locIds.map(function(id){return '<option value="'+id+'"'+(f.locationId===id?' selected':'')+'>'+esc(locName(id))+'</option>';}).join('')+
+      '</select>';
+  }
+  if(showTrainer){
+    out+='<label class="vh" for="filterTrainer">Filter by trainer</label><select id="filterTrainer" data-change="filterTrainer">'+
+      '<option value="all"'+(f.trainerId==='all'?' selected':'')+'>All trainers</option>'+
+      '<option value="unassigned"'+(f.trainerId==='unassigned'?' selected':'')+'>Unassigned</option>'+
+      trainerIds.map(function(id){var s=staffById(id);return '<option value="'+id+'"'+(f.trainerId===id?' selected':'')+'>'+esc(s?s.name:id)+'</option>';}).join('')+
+      '</select>';
+  }
+  out+='</div>';
+  return out;
+}
 function renderPeople(){
   var h=needsAttentionHtml();
   if(Draft.current){
@@ -1193,14 +1237,24 @@ function renderPeople(){
     h+='<div class="banner"><div><strong>Session in progress</strong><br><span class="muted">'+esc(dm?dm.name:'')+' · started '+fmtTime(Draft.current.startedAt)+'</span></div><button type="button" class="btn primary sm" data-a="resume">Resume</button></div>';
   }
   var canAdd=role()==='owner'||role()==='manager'||role()==='trainer';
-  var members=visibleMembers();
+  var baseMembers=visibleMembers();
   if(role()==='trainer'){
-    members=members.filter(function(m){return trainerIsSelf(m.id);});
+    baseMembers=baseMembers.filter(function(m){return trainerIsSelf(m.id);});
   }
+  var f=STATE.peopleFilters;
+  var locIds=[];baseMembers.forEach(function(m){if(locIds.indexOf(m.homeLocationId)<0)locIds.push(m.homeLocationId);});
+  var showLocation=locIds.length>1;
+  var showTrainer=role()==='owner'||role()==='manager';
+  var members=baseMembers;
+  if(f.status!=='all')members=members.filter(function(m){return m.status===f.status;});
+  if(showLocation&&f.locationId!=='all')members=members.filter(function(m){return m.homeLocationId===f.locationId;});
+  if(showTrainer&&f.trainerId!=='all')members=members.filter(function(m){return f.trainerId==='unassigned'?!trainerIdFor(m.id):trainerIdFor(m.id)===f.trainerId;});
   members.sort(function(a,b){return a.name.localeCompare(b.name);});
   h+='<div class="sec inline" style="justify-content:space-between"><h2 style="margin:0">'+(role()==='trainer'?'Your clients':'Members')+'</h2>'+
     (canAdd?'<button type="button" class="btn ghost sm" data-a="openAddMember">+ Add member</button>':'')+'</div>';
-  if(!members.length){h+='<div class="empty"><p><strong>Nothing here yet.</strong></p><p class="muted">'+(role()==='trainer'?'Ask the owner or a manager to assign you a client.':'Add a member to get started.')+'</p></div>';}
+  h+=peopleFiltersHtml(baseMembers);
+  if(!baseMembers.length){h+='<div class="empty"><p><strong>Nothing here yet.</strong></p><p class="muted">'+(role()==='trainer'?'Ask the owner or a manager to assign you a client.':'Add a member to get started.')+'</p></div>';}
+  else if(!members.length){h+='<p class="muted">No members match these filters.</p>';}
   h+='<ul class="list">'+members.map(function(m){
     var tn=trainerNameFor(m.id);
     var assignCtl='';
@@ -1214,6 +1268,10 @@ function renderPeople(){
       (role()!=='trainer'?assignCtl:'')+'</li>';
   }).join('')+'</ul>';
   return h;
+}
+function trainerIdFor(memberId){
+  var a=(STATE.boot.assignments||[]).filter(function(x){return x.memberId===memberId&&x.active;})[0];
+  return a?a.trainerId:null;
 }
 function trainerIsSelf(memberId){
   return (STATE.boot.assignments||[]).some(function(a){return a.memberId===memberId&&a.trainerId===Auth.current.userId&&a.active;});
@@ -1590,6 +1648,9 @@ document.addEventListener('change',function(ev){
   var el=ev.target.closest('[data-change]');if(!el)return;
   var k=el.dataset.change;
   if(k==='chartEx'){STATE.chartEx=el.value;STATE.nav=false;}
+  if(k==='filterStatus'){STATE.peopleFilters.status=el.value;STATE.nav=false;}
+  if(k==='filterLocation'){STATE.peopleFilters.locationId=el.value;STATE.nav=false;}
+  if(k==='filterTrainer'){STATE.peopleFilters.trainerId=el.value;STATE.nav=false;}
   render();
 });
 document.addEventListener('input',function(ev){
