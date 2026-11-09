@@ -1447,6 +1447,7 @@ function doLogin(loginId,pin){
 
 document.addEventListener('click',function(ev){
   var el=ev.target.closest('[data-a]');if(!el)return;
+  if(el.tagName==='FORM')return; // forms are driven by the 'submit' listener below, not click-bubbling
   var f=A[el.dataset.a];if(!f)return;
   if(f(el,ev)===false)return;
   render();
