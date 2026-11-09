@@ -90,11 +90,11 @@ select,.search,input[type=text],input[type=password],input[type=tel]{width:100%;
 .pr{font-size:11px;font-weight:800;letter-spacing:.08em;background:var(--pr-bg);color:var(--pr);border-radius:4px;padding:3px 6px}
 .edt{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:1px 6px}
 .entry{border-top:1px solid var(--line);padding-top:10px}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .step{min-width:0;margin-top:4px}
-.stepc{display:grid;grid-template-columns:52px minmax(0,1fr) 52px;gap:6px}
-.sb{height:56px;border:1px solid var(--line);background:var(--raised);border-radius:10px;font-size:28px;font-weight:600;line-height:1;padding:0}
-.stepc input{min-width:0;width:100%;height:56px;text-align:center;border:1px solid var(--line);border-radius:10px;background:var(--raised);font-family:var(--font-display);font-weight:700;font-size:32px;font-variant-numeric:tabular-nums}
+.stepc{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:3px}
+.sb{height:56px;border:1px solid var(--line);background:var(--raised);border-radius:10px;font-size:22px;font-weight:600;line-height:1;padding:0}
+.stepc input{min-width:0;width:100%;height:56px;text-align:center;border:1px solid var(--line);border-radius:10px;background:var(--raised);font-family:var(--font-display);font-weight:700;font-size:20px;font-variant-numeric:tabular-nums;padding:0}
 .unit{display:block;text-align:center;font-size:13px;color:var(--muted);margin-top:3px}
 .bar{position:fixed;left:0;right:0;bottom:0;z-index:25;background:var(--surface);border-top:1px solid var(--line);
   padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
@@ -331,7 +331,7 @@ var Api=(function(){
  * is a simplified re-implementation of backend/src/Api.js's action handlers
  * (that file needs real Apps Script services it can't fake in a browser). */
 var DemoApi=(function(){
-  var KEY='floorlog.demo.v2';
+  var KEY='floorlog.demo.v3';
   var PINS={owner:'111111',manager:'222222',trainer1:'333333',trainer2:'444444',member1:'666666'};
 
   function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
@@ -419,15 +419,15 @@ var DemoApi=(function(){
       }
     }
     return {
-      v:2,locations:locations,staff:staff,members:members,assignments:assignments,
-      exercises:exercises,sessions:sessions,sets:sets,setEdits:setEdits,
-      config:{timezone:'Asia/Singapore'}
+      v:3,locations:locations,staff:staff,members:members,assignments:assignments,
+      exercises:exercises,sessions:sessions,sets:sets,setEdits:setEdits,programmes:[],
+      config:{timezone:'Asia/Singapore',member_self_logging:'FALSE'}
     };
   }
 
   function load(){
     if(!LS)return seed();
-    try{var raw=LS.getItem(KEY);var o=raw?JSON.parse(raw):null;if(o&&o.v===2)return o;}catch(e){}
+    try{var raw=LS.getItem(KEY);var o=raw?JSON.parse(raw):null;if(o&&o.v===3)return o;}catch(e){}
     return seed();
   }
   var D=load();
@@ -455,8 +455,10 @@ var DemoApi=(function(){
   function publicMember(m){return {id:m.id,name:m.name,homeLocationId:m.homeLocationId,status:m.status};}
   function publicStaff(s){return {id:s.id,name:s.name,role:s.role,active:s.active,locationIds:s.locationIds};}
   function publicExercise(e){return {id:e.id,name:e.name,muscleGroup:e.muscleGroup,equipment:e.equipment,logType:e.logType,aliases:e.aliases,review:e.review,createdBy:e.createdBy};}
+  function publicProgramme(p){return {id:p.id,name:p.name,exerciseIds:p.exerciseIds,createdBy:p.createdBy,createdByKind:p.createdByKind};}
   function err(error,code){return {ok:false,error:error,code:code||400};}
   function ok(data){return {ok:true,data:data};}
+  function isSelfLoggingEnabled(){return D.config.member_self_logging==='TRUE';}
 
   function doLogin(body){
     var loginId=String(body.loginId||'').trim(),pin=String(body.pin||'');
@@ -495,7 +497,12 @@ var DemoApi=(function(){
         return canSeeStaff(actor,s,shared);
       }).map(publicStaff);
     }
-    return ok({role:actor.kind==='staff'?actor.role:'member',locations:D.locations,members:members,assignments:assignments,exercises:exercises,staff:staffList,config:D.config});
+    var usedProgrammeIds={};
+    if(actor.kind==='member'){
+      D.sessions.filter(function(s){return s.memberId===actor.memberId&&s.programmeId;}).forEach(function(s){usedProgrammeIds[s.programmeId]=true;});
+    }
+    var programmes=D.programmes.filter(function(p){return canSeeProgramme(actor,p,!!usedProgrammeIds[p.id]);}).map(publicProgramme);
+    return ok({role:actor.kind==='staff'?actor.role:'member',locations:D.locations,members:members,assignments:assignments,exercises:exercises,staff:staffList,programmes:programmes,config:D.config});
   }
 
   function doHistory(actor,body){
@@ -569,15 +576,22 @@ var DemoApi=(function(){
       if(existing)return {ok:true,data:{id:existing.id,duplicate:true}};
       var member=byId(D.members,op.memberId);if(member)enrichMember(member);
       if(!member)return {ok:false,error:'not_found',code:404};
-      if(!canCreateSession(actor,member,op.trainerId,op.locationId))return {ok:false,error:'forbidden',code:403};
-      D.sessions.push({id:op.id,memberId:op.memberId,trainerId:op.trainerId,locationId:op.locationId,startedAt:op.startedAt||new Date().toISOString(),endedAt:null,notes:sanitizeText(op.notes,500),createdAt:new Date().toISOString()});
+      var trainerId=actor.kind==='member'?'':op.trainerId;
+      if(!canCreateSession(actor,member,trainerId,op.locationId,isSelfLoggingEnabled()))return {ok:false,error:'forbidden',code:403};
+      var programmeId='';
+      if(op.programmeId){
+        var programme=byId(D.programmes,op.programmeId);
+        if(!programme)return {ok:false,error:'bad_programme',code:400};
+        programmeId=programme.id;
+      }
+      D.sessions.push({id:op.id,memberId:op.memberId,trainerId:trainerId,locationId:op.locationId,programmeId:programmeId,startedAt:op.startedAt||new Date().toISOString(),endedAt:null,notes:sanitizeText(op.notes,500),createdAt:new Date().toISOString()});
       return {ok:true,data:{id:op.id}};
     }
     if(op.type==='finishSession'){
       var session=byId(D.sessions,op.id);
       if(!session)return {ok:false,error:'not_found',code:404};
       var m2=byId(D.members,session.memberId);if(m2)enrichMember(m2);
-      if(!m2||!canUpdateSession(actor,session,m2))return {ok:false,error:'forbidden',code:403};
+      if(!m2||!canUpdateSession(actor,session,m2,isSelfLoggingEnabled()))return {ok:false,error:'forbidden',code:403};
       session.endedAt=op.endedAt||new Date().toISOString();
       if(op.notes!=null)session.notes=sanitizeText(op.notes,500);
       return {ok:true,data:{id:session.id}};
@@ -588,7 +602,7 @@ var DemoApi=(function(){
       var sess=byId(D.sessions,op.sessionId);
       if(!sess)return {ok:false,error:'not_found',code:404};
       var m3=byId(D.members,sess.memberId);if(m3)enrichMember(m3);
-      if(!m3||!canAddSet(actor,sess,m3))return {ok:false,error:'forbidden',code:403};
+      if(!m3||!canAddSet(actor,sess,m3,isSelfLoggingEnabled()))return {ok:false,error:'forbidden',code:403};
       var ex=byId(D.exercises,op.exerciseId);
       if(!ex||ex.mergedInto)return {ok:false,error:'bad_exercise',code:400};
       var check=validateSetFields(ex.logType,{weightKg:op.weightKg,reps:op.reps,seconds:op.seconds,distanceM:op.distanceM,rpe:op.rpe});
@@ -604,7 +618,7 @@ var DemoApi=(function(){
       if(!set2)return {ok:false,error:'not_found',code:404};
       var sess2=byId(D.sessions,set2.sessionId);
       var m4=byId(D.members,sess2.memberId);if(m4)enrichMember(m4);
-      if(!m4||!canEditOrDeleteSet(actor,sess2,m4))return {ok:false,error:'forbidden',code:403};
+      if(!m4||!canEditOrDeleteSet(actor,sess2,m4,isSelfLoggingEnabled()))return {ok:false,error:'forbidden',code:403};
       var ex2=byId(D.exercises,set2.exerciseId);
       var check2=validateSetFields(ex2.logType,{weightKg:op.weightKg,reps:op.reps,seconds:op.seconds,distanceM:op.distanceM,rpe:op.rpe});
       if(!check2.ok)return {ok:false,error:check2.error,code:400};
@@ -619,7 +633,7 @@ var DemoApi=(function(){
       if(!set3)return {ok:false,error:'not_found',code:404};
       var sess3=byId(D.sessions,set3.sessionId);
       var m5=byId(D.members,sess3.memberId);if(m5)enrichMember(m5);
-      if(!m5||!canEditOrDeleteSet(actor,sess3,m5))return {ok:false,error:'forbidden',code:403};
+      if(!m5||!canEditOrDeleteSet(actor,sess3,m5,isSelfLoggingEnabled()))return {ok:false,error:'forbidden',code:403};
       if(set3.deletedAt)return {ok:true,data:{id:set3.id,duplicate:true}};
       var before3={weightKg:set3.weightKg,reps:set3.reps,seconds:set3.seconds,distanceM:set3.distanceM,rpe:set3.rpe};
       set3.deletedAt=new Date().toISOString();set3.editedAt=set3.deletedAt;
@@ -638,6 +652,22 @@ var DemoApi=(function(){
       var exercise={id:op.id,name:name,muscleGroup:sanitizeText(op.muscleGroup||'Other',40),equipment:sanitizeText(op.equipment||'Other',40),logType:op.logType,aliases:sanitizeText(op.aliases||'',200),review:'pending',createdBy:actor.id,mergedInto:''};
       D.exercises.push(exercise);
       return {ok:true,data:publicExercise(exercise)};
+    }
+    if(op.type==='addProgramme'){
+      if(!canCreateProgramme(actor))return {ok:false,error:'forbidden',code:403};
+      var existingProg=byId(D.programmes,op.id);
+      if(existingProg)return {ok:true,data:{id:existingProg.id,duplicate:true}};
+      var progName=sanitizeText(op.name,80);
+      if(!progName)return {ok:false,error:'missing_name',code:400};
+      var exIds=Array.isArray(op.exerciseIds)?op.exerciseIds:[];
+      if(!exIds.length)return {ok:false,error:'missing_exercises',code:400};
+      for(var pi=0;pi<exIds.length;pi++){
+        var pex=byId(D.exercises,exIds[pi]);
+        if(!pex||pex.mergedInto)return {ok:false,error:'bad_exercise',code:400};
+      }
+      var programme={id:op.id,name:progName,exerciseIds:exIds.slice(),createdBy:actor.kind==='staff'?actor.id:actor.memberId,createdByKind:actor.kind,createdAt:new Date().toISOString()};
+      D.programmes.push(programme);
+      return {ok:true,data:publicProgramme(programme)};
     }
     return {ok:false,error:'unknown_op',code:400};
   }
@@ -742,6 +772,7 @@ function staffById(id){return byId(STATE.boot&&STATE.boot.staff,id);}
 function pill(m){return '<span class="pill '+(m.status==='active'?'ok':'off')+'">'+(m.status==='active'?'Active':'Expired')+'</span>';}
 function role(){return Auth.current&&Auth.current.role;}
 function kind(){return Auth.current&&Auth.current.kind;}
+function selfLoggingEnabled(){return !!(STATE.boot&&STATE.boot.config&&STATE.boot.config.member_self_logging==='TRUE');}
 
 function fmtSet(e,s){
   if(e.logType==='weight_reps')return fmtN(s.weightKg)+' kg × '+s.reps;
@@ -959,6 +990,25 @@ function sheetHtml(){
       '<div class="sec"><label class="lbl" for="newMemberLoc">Branch</label><select id="newMemberLoc">'+locs.map(function(l){return '<option value="'+l.id+'"'+(l.id===defaultLoc?' selected':'')+'>'+esc(l.name)+'</option>';}).join('')+'</select></div>'+
       '<button type="button" class="btn primary block" data-a="saveAddMember">Add member</button></div></div></div>';
   }
+  if(STATE.sheet==='startPicker'){
+    var progs=STATE.boot.programmes||[];
+    return '<div class="sheet-back" data-a="closeSheet"><div class="sheet" role="dialog" aria-label="Start session"><div class="sh"><strong>Start session</strong><button type="button" class="lnk" data-a="closeSheet">Close</button></div><div class="sl pad">'+
+      '<button type="button" class="btn ghost block" data-a="startBlank">Start blank</button>'+
+      (progs.length?'<p class="cap" style="margin-top:16px">Or start from a saved template</p><ul class="list">'+progs.map(function(p){
+        return '<li class="rev"><div class="nm">'+esc(p.name)+'</div><div class="sub">'+p.exerciseIds.length+' exercises</div>'+
+          '<div class="revr"><button type="button" class="btn primary sm" data-a="startFromProgramme" data-id="'+p.id+'">Use</button></div></li>';
+      }).join('')+'</ul>':'')+
+      '</div></div></div>';
+  }
+  if(STATE.sheet==='saveTemplate'){
+    var exIds=Draft.current.exercises.map(function(b){return b.exerciseId;});
+    return '<div class="sheet-back" data-a="closeSheet"><div class="sheet" role="dialog" aria-label="Save as template"><div class="sh"><strong>Save as template</strong><button type="button" class="lnk" data-a="closeSheet">Close</button></div><div class="sl pad">'+
+      (STATE.sheetError?'<div class="errbox" role="alert">'+esc(STATE.sheetError)+'</div>':'')+
+      '<p class="cap">Saves this list of exercises for quick reuse later — not the weights or reps.</p>'+
+      '<ul class="plain small">'+exIds.map(function(id){var e=exById(id);return '<li>'+esc(e?e.name:id)+'</li>';}).join('')+'</ul>'+
+      '<label class="lbl" for="templateName">Template name</label><input id="templateName" type="text" maxlength="80" placeholder="e.g. Push Day A">'+
+      '<button type="button" class="btn primary block" data-a="saveTemplate">Save template</button></div></div></div>';
+  }
   return '';
 }
 
@@ -1084,7 +1134,7 @@ function progressHtml(memberId,h){
     return {x:best.sessionStartedAt,y:displayScore(e,best)};
   }).sort(function(a,b){return a.x-b.x;});
   var h2='<h2>Progress</h2><label class="lbl" for="chartSel">Exercise</label><select id="chartSel" data-change="chartEx">'+exIds.map(function(id){return '<option value="'+id+'"'+(id===e.id?' selected':'')+'>'+esc(exById(id).name)+'</option>';}).join('')+'</select>'+
-    '<p class="cap">'+METRIC_LABEL[e.logType]+'</p>'+lineChart(pts,exById(STATE.chartEx).name+' '+METRIC_LABEL[e.logType]);
+    '<p class="cap" style="margin-top:10px">'+METRIC_LABEL[e.logType]+'</p>'+lineChart(pts,exById(STATE.chartEx).name+' '+METRIC_LABEL[e.logType]);
   var now=Date.now(),w0=weekStartMs(now,TZ());
   var rows=[];for(var i=7;i>=0;i--)rows.push({t:w0-i*7*DAY,v:0});
   var vol=weeklyVolume(allSets.map(function(s){var ex=exById(s.exerciseId);return Object.assign({},s,{logType:ex?ex.logType:null});}),TZ());
@@ -1152,13 +1202,14 @@ function renderPerson(){
   var h=STATE.historyCache[id];
   if(!h){withHistory(id,function(){});h={loading:true};}
   var canStaffView=kind()==='staff';
+  var canMemberLog=kind()==='member'&&selfLoggingEnabled();
   var h1='';
   if(canStaffView)h1+='<button type="button" class="back" data-a="back">‹ '+(role()==='trainer'?'Clients':'Members')+'</button>';
   h1+='<div class="who"><span class="av lg">'+esc(initials(m.name))+'</span><div class="grow"><h2 class="nm2">'+esc(m.name)+'</h2><span class="muted">'+(m.homeLocationId?esc(locName(m.homeLocationId))+' · ':'')+((h.sessions||[]).length)+' sessions</span></div>'+(canStaffView?pill(m):'')+'</div>';
 
-  if(canStaffView){
+  if(canStaffView||canMemberLog){
     var resuming=Draft.current&&Draft.current.memberId===id;
-    var canStart=canStartSessionFor(m);
+    var canStart=canStaffView?canStartSessionFor(m):canMemberLog;
     if(Draft.current&&!resuming)h1+='<p class="note">A session with another client is still open. Finish or discard it first.</p>';
     else if(canStart)h1+='<button type="button" class="btn primary block" data-a="'+(resuming?'resume':'startSession')+'">'+(resuming?'Resume session':'Start session')+'</button>';
     if(role()==='owner'||role()==='manager'){
@@ -1166,7 +1217,7 @@ function renderPerson(){
     }
   }
 
-  var body=canStaffView?h1:h1;
+  var body=h1;
   if(!h.loading&&!h.error){body+=progressHtml(id,h);}
   body+='<h2>History</h2>'+historyHtml(id,canEditFor(m,h),h);
   return body;
@@ -1178,6 +1229,7 @@ function canStartSessionFor(m){
   return false;
 }
 function canEditFor(m,h){
+  if(kind()==='member')return selfLoggingEnabled(); // only ever applies to their own self-logged sets; server/demo re-checks per-set.
   if(kind()!=='staff')return false;
   if(role()==='owner'||role()==='manager')return true;
   // trainer: only sets inside sessions they themselves created.
@@ -1198,8 +1250,10 @@ function renderLog(){
   var pr=prMapFor(d.memberId,h);
   var nsets=d.exercises.reduce(function(a,b){return a+b.sets.length;},0);
   var vol=Math.round(d.exercises.reduce(function(a,b){return a+volumeOf(b.sets.map(function(s){return {exerciseId:b.exerciseId,weightKg:s.weightKg,reps:s.reps};}));},0));
+  var prog=d.programmeId?byId(STATE.boot.programmes,d.programmeId):null;
   var out='<button type="button" class="back" data-a="leaveLog">‹ '+esc(m.name)+'</button>'+
-    '<div class="logHead"><h2 class="nm2">Session</h2><span class="muted">Started '+fmtTime(d.startedAt)+' · '+nsets+' sets · '+vol.toLocaleString('en-SG')+' kg</span></div>';
+    '<div class="logHead"><h2 class="nm2">Session</h2><span class="muted">Started '+fmtTime(d.startedAt)+' · '+nsets+' sets · '+vol.toLocaleString('en-SG')+' kg'+(prog?' · '+esc(prog.name):'')+'</span></div>';
+  if(d.exercises.length)out+='<button type="button" class="lnk" data-a="openSaveTemplate" style="padding-left:0">Save as template</button>';
   if(!d.exercises.length){
     var prevSessions=(h.sessions||[]).slice().sort(function(a,b){return new Date(a.startedAt)-new Date(b.startedAt);});
     var prev=prevSessions.length?prevSessions[prevSessions.length-1]:null;
@@ -1260,10 +1314,24 @@ function queueManagementAction(type,payload){
 /* ---------- branches (owner) ---------- */
 function startDraft(memberId){
   var m=memberById(memberId);
-  Draft.current={id:uuid(),memberId:memberId,trainerId:Auth.current.userId,locationId:m.homeLocationId,startedAt:new Date().toISOString(),exercises:[],inputs:{}};
+  Draft.current={id:uuid(),memberId:memberId,trainerId:kind()==='staff'?Auth.current.userId:'',locationId:m.homeLocationId,programmeId:'',startedAt:new Date().toISOString(),exercises:[],inputs:{}};
   Draft.save();
 }
 function addToDraft(exerciseId){if(!Draft.current.exercises.some(function(b){return b.exerciseId===exerciseId;}))Draft.current.exercises.push({exerciseId:exerciseId,sets:[]});}
+
+function doStartSession(memberId,programmeId){
+  startDraft(memberId);
+  if(programmeId){
+    var programme=byId(STATE.boot.programmes,programmeId);
+    if(programme){
+      Draft.current.programmeId=programmeId;
+      programme.exerciseIds.forEach(function(exId){if(exById(exId))addToDraft(exId);});
+    }
+  }
+  Draft.save();
+  queueManagementAction('createSession',{id:Draft.current.id,memberId:Draft.current.memberId,trainerId:Draft.current.trainerId,locationId:Draft.current.locationId,programmeId:Draft.current.programmeId||'',startedAt:Draft.current.startedAt});
+  STATE.sheet=null;STATE.screen='log';STATE.nav=true;
+}
 
 function renderBranches(){
   var h='<h2>Branches</h2><ul class="list">'+(STATE.boot.locations||[]).map(function(l){
@@ -1304,6 +1372,18 @@ var A={
     STATE.sheet=null;STATE.nav=false;
     queueManagementAction('addMember',{name:name,homeLocationId:locId,id:id});
   },
+  openSaveTemplate:function(){STATE.sheet='saveTemplate';STATE.sheetError=null;},
+  saveTemplate:function(){
+    var name=document.getElementById('templateName').value.trim();
+    if(!name){STATE.sheetError='Enter a name.';return;}
+    var exerciseIds=Draft.current.exercises.map(function(b){return b.exerciseId;});
+    if(!exerciseIds.length){STATE.sheetError='Nothing logged yet to save.';return;}
+    var id=uuid();
+    var programme={id:id,name:sanitizeText(name,80),exerciseIds:exerciseIds,createdBy:Auth.current.userId,createdByKind:kind()};
+    STATE.boot.programmes=(STATE.boot.programmes||[]).concat([programme]);
+    STATE.sheet=null;STATE.nav=false;
+    queueManagementAction('addProgramme',{id:id,name:name,exerciseIds:exerciseIds});
+  },
   toggleStatus:function(el){
     var m=memberById(el.dataset.id);if(!m)return;
     m.status=m.status==='active'?'expired':'active';
@@ -1319,10 +1399,11 @@ var A={
   },
 
   startSession:function(){
-    startDraft(STATE.personId);
-    queueManagementAction('createSession',{id:Draft.current.id,memberId:Draft.current.memberId,trainerId:Draft.current.trainerId,locationId:Draft.current.locationId,startedAt:Draft.current.startedAt});
-    STATE.screen='log';STATE.nav=true;
+    if((STATE.boot.programmes||[]).length){STATE.sheet='startPicker';return;}
+    doStartSession(STATE.personId,null);
   },
+  startBlank:function(){doStartSession(STATE.personId,null);},
+  startFromProgramme:function(el){doStartSession(STATE.personId,el.dataset.id);},
   resume:function(){STATE.personId=Draft.current.memberId;STATE.screen='log';STATE.nav=true;},
   leaveLog:function(){STATE.screen='person';STATE.confirmDiscard=false;STATE.nav=true;},
   copyLast:function(){

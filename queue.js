@@ -13,7 +13,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var SYNC_OP_TYPES = { createSession: 1, finishSession: 1, addSet: 1, editSet: 1, deleteSet: 1, addCustomExercise: 1 };
+  var SYNC_OP_TYPES = { createSession: 1, finishSession: 1, addSet: 1, editSet: 1, deleteSet: 1, addCustomExercise: 1, addProgramme: 1 };
   var MGMT_ACTIONS = { addMember: 1, setMemberStatus: 1, assignClient: 1, approveExercise: 1, mergeExercise: 1 };
 
   function isPermanent(code) { return code === 400 || code === 403 || code === 404 || code === 409; }
