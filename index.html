@@ -1132,7 +1132,7 @@ function renderPeople(){
     var assignCtl='';
     if(role()==='owner'||role()==='manager'){
       var trainers=(STATE.boot.staff||[]).filter(function(s){return s.role==='trainer'&&s.active&&s.locationIds.indexOf(m.homeLocationId)>=0;});
-      assignCtl='<div class="revr" style="margin-top:8px"><label class="vh" for="asg_'+m.id+'">Assign trainer</label><select id="asg_'+m.id+'" data-a="noop">'+
+      assignCtl='<div class="revr" style="margin-top:8px"><label class="vh" for="asg_'+m.id+'">Assign trainer</label><select id="asg_'+m.id+'">'+
         '<option value="">Unassigned</option>'+trainers.map(function(t){return '<option value="'+t.id+'"'+(tn===t.name?' selected':'')+'>'+esc(t.name)+'</option>';}).join('')+
         '</select><button type="button" class="btn ghost sm" data-a="assignTrainer" data-id="'+m.id+'">Set</button></div>';
     }
