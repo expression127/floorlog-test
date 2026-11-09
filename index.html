@@ -510,14 +510,13 @@ var DemoApi=(function(){
     if(member)enrichMember(member);
     if(!member||!canSeeMember(actor,member))return err('forbidden',403);
     var sessions=D.sessions.filter(function(s){return s.memberId===body.memberId;});
-    var sessionIds={};sessions.forEach(function(s){sessionIds[s.id]=true;});
-    var sets=D.sets.filter(function(s){return sessionIds[s.sessionId];});
+    var sessionById={};sessions.forEach(function(s){sessionById[s.id]=s;});
+    var sets=D.sets.filter(function(s){return sessionById[s.sessionId];});
     var setEdits=[];
     if(actor.kind==='staff'){
-      var setIds={};sets.forEach(function(s){setIds[s.id]=true;});
-      setEdits=D.setEdits.filter(function(e){return setIds[e.setId];}).filter(function(e){
-        var set=byId(sets,e.setId);if(!set)return false;
-        var session=byId(sessions,set.sessionId);
+      var sessionIdBySetId={};sets.forEach(function(s){sessionIdBySetId[s.id]=s.sessionId;});
+      setEdits=D.setEdits.filter(function(e){return sessionIdBySetId.hasOwnProperty(e.setId);}).filter(function(e){
+        var session=sessionById[sessionIdBySetId[e.setId]];
         return session&&canSeeAudit(actor,session);
       });
     }
@@ -529,8 +528,14 @@ var DemoApi=(function(){
     var name=sanitizeText(body.name,80);
     if(!name)return err('missing_name',400);
     var member={id:body.id||uuid(),name:name,homeLocationId:body.homeLocationId,status:'active'};
-    D.members.push(member);persist();
-    return ok(publicMember(member));
+    D.members.push(member);
+    var assignedTrainerId=null;
+    if(actor.kind==='staff'&&actor.role==='trainer'){
+      D.assignments.push({trainerId:actor.id,memberId:member.id,active:true,since:new Date().toISOString().slice(0,10)});
+      assignedTrainerId=actor.id;
+    }
+    persist();
+    return ok(Object.assign(publicMember(member),{assignedTrainerId:assignedTrainerId}));
   }
   function doSetMemberStatus(actor,body){
     var member=byId(D.members,body.memberId);
@@ -826,13 +831,28 @@ function draftSetsFor(memberId){
   var out=[];d.exercises.forEach(function(blk){blk.sets.forEach(function(s){out.push(Object.assign({exerciseId:blk.exerciseId,sessionId:d.id,sessionStartedAt:d.startedAt},s));});});
   return out;
 }
+// Builds a plain object index { [item.id]: item } once, instead of the
+// linear byId() scan repeated per set/session — the difference between an
+// O(sets) and an O(sets * sessions) history render once there's real data.
+function indexById_(arr){var m={};(arr||[]).forEach(function(x){m[x.id]=x;});return m;}
+
 function allSetsFor(memberId,h){
-  var fromHistory=(h&&h.sets||[]).map(function(s){var sess=byId(h.sessions,s.sessionId);return Object.assign({},s,{sessionStartedAt:sess?new Date(sess.startedAt).getTime():0});});
+  var sessById=indexById_(h&&h.sessions);
+  var fromHistory=(h&&h.sets||[]).map(function(s){var sess=sessById[s.sessionId];return Object.assign({},s,{sessionStartedAt:sess?new Date(sess.startedAt).getTime():0});});
   return fromHistory.concat(draftSetsFor(memberId).map(function(s){return Object.assign({},s,{sessionStartedAt:new Date(s.sessionStartedAt||Date.now()).getTime()});}));
 }
+// Caches the (memberId, sets array reference) this was last computed for,
+// since progressHtml and historyHtml both need it on every render of the
+// same person screen — recomputing it twice per render was the main cost
+// once a member has real history.
+var PR_CACHE_={memberId:null,setsRef:null,pr:null};
 function prMapFor(memberId,h){
-  var withTypes=allSetsFor(memberId,h).map(function(s){var e=exById(s.exerciseId);return Object.assign({},s,{logType:e?e.logType:null});}).filter(function(s){return s.logType;});
-  return computePRs(withTypes);
+  if(PR_CACHE_.memberId===memberId&&PR_CACHE_.setsRef===(h&&h.sets))return PR_CACHE_.pr;
+  var exIndex=indexById_(STATE.boot&&STATE.boot.exercises);
+  var withTypes=allSetsFor(memberId,h).map(function(s){var e=exIndex[s.exerciseId];return Object.assign({},s,{logType:e?e.logType:null});}).filter(function(s){return s.logType;});
+  var pr=computePRs(withTypes);
+  PR_CACHE_={memberId:memberId,setsRef:h&&h.sets,pr:pr};
+  return pr;
 }
 
 /* ---------- boot / login ---------- */
@@ -891,11 +911,12 @@ function renderChipOnly(){
 }
 function headerHtml(){
   var segRoles,segLabels;
-  if(role()==='owner'){segRoles=['branches','people','review'];segLabels={branches:'Branches',people:'Members',review:'Review'};}
-  else if(role()==='manager'){segRoles=['people','review'];segLabels={people:'Members',review:'Review'};}
+  if(role()==='owner'){segRoles=['branches','people','review','templates'];segLabels={branches:'Branches',people:'Members',review:'Review',templates:'Templates'};}
+  else if(role()==='manager'){segRoles=['people','review','templates'];segLabels={people:'Members',review:'Review',templates:'Templates'};}
+  else if(role()==='trainer'){segRoles=['people','templates'];segLabels={people:'Clients',templates:'Templates'};}
   else segRoles=null;
   var seg='';
-  if(segRoles&&(STATE.screen==='people'||STATE.screen==='review'||STATE.screen==='branches')){
+  if(segRoles&&(STATE.screen==='people'||STATE.screen==='review'||STATE.screen==='branches'||STATE.screen==='templates')){
     seg='<div class="seg" style="grid-template-columns:repeat('+segRoles.length+',1fr)" role="tablist" aria-label="Section">'+
       segRoles.map(function(s){return '<button type="button" role="tab" aria-selected="'+(STATE.section===s)+'" data-a="section" data-id="'+s+'">'+segLabels[s]+'</button>';}).join('')+'</div>';
   }
@@ -922,6 +943,7 @@ function render(){
     else if(STATE.screen==='summary')body=renderSummary();
     else if(STATE.screen==='review')body=renderReview();
     else if(STATE.screen==='branches')body=renderBranches();
+    else if(STATE.screen==='templates')body=renderTemplates();
     else {STATE.screen='people';body=renderPeople();}
     app.innerHTML=header+'<main class="wrap">'+body+'</main>'+sheetHtml();
   }
@@ -1064,8 +1086,10 @@ function historyHtml(memberId,canEdit,h){
   var ss=(h.sessions||[]).slice().sort(function(a,b){return new Date(b.startedAt)-new Date(a.startedAt);});
   var pr=prMapFor(memberId,h);
   if(!ss.length)return '<p class="muted">No sessions logged yet.</p>'+(h.stale?'<p class="cap">Showing cached data — you are offline.</p>':'');
+  var setsBySession={};
+  (h.sets||[]).forEach(function(s){if(s.deletedAt)return;(setsBySession[s.sessionId]=setsBySession[s.sessionId]||[]).push(s);});
   return (h.stale?'<p class="cap">Showing cached data from your last visit — you are offline.</p>':'')+'<div class="hist">'+ss.map(function(se,i){
-    var sets=(h.sets||[]).filter(function(s){return s.sessionId===se.id&&!s.deletedAt;});
+    var sets=setsBySession[se.id]||[];
     var g=groupByEx(sets),tr=staffById(se.trainerId);
     return '<details'+(i===0?' open':'')+'><summary><span class="hd">'+fmtDate(se.startedAt)+'</span><span class="muted">'+g.length+' exercises · '+Math.round(volumeOf(sets)).toLocaleString('en-SG')+' kg</span></summary><div class="hbody">'+
       '<p class="muted small">'+esc(locName(se.locationId))+(tr?' · '+esc(tr.name):'')+'</p>'+
@@ -1344,6 +1368,25 @@ function renderBranches(){
   return h;
 }
 
+/* ---------- templates (session programmes) browse screen ---------- */
+function renderTemplates(){
+  var progs=(STATE.boot.programmes||[]).slice().sort(function(a,b){return a.name.localeCompare(b.name);});
+  var h='<h2>Templates</h2><p class="cap">Saved exercise lists — pick one from any member’s "Start session" to use it.</p>';
+  if(!progs.length){
+    h+='<div class="empty"><p><strong>No templates yet.</strong></p><p class="muted">Save one from the “Save as template” link while logging a session.</p></div>';
+    return h;
+  }
+  h+='<ul class="list">'+progs.map(function(p){
+    var names=p.exerciseIds.map(function(id){var e=exById(id);return e?e.name:id;}).join(', ');
+    var creator;
+    if(p.createdBy===Auth.current.userId)creator='you';
+    else if(p.createdByKind==='staff'){var s=staffById(p.createdBy);creator=s?s.name:'a staff member';}
+    else{var m=memberById(p.createdBy);creator=m?m.name:'a member';}
+    return '<li class="rev"><div class="nm">'+esc(p.name)+'</div><div class="sub">'+esc(names)+'</div><div class="sub muted small">Saved by '+esc(creator)+'</div></li>';
+  }).join('')+'</ul>';
+  return h;
+}
+
 /* ============================================================ actions ============================================================ */
 function queueHasItems(){return Queue.list().then(function(l){return l.length>0;});}
 function confirmIfQueued(message){
@@ -1369,6 +1412,9 @@ var A={
     if(!name){STATE.sheetError='Enter a name.';return;}
     var id=uuid();
     STATE.boot.members.push({id:id,name:name,homeLocationId:locId,status:'active'});
+    if(role()==='trainer'){
+      STATE.boot.assignments=(STATE.boot.assignments||[]).concat([{trainerId:Auth.current.userId,memberId:id,active:true,since:new Date().toISOString().slice(0,10)}]);
+    }
     STATE.sheet=null;STATE.nav=false;
     queueManagementAction('addMember',{name:name,homeLocationId:locId,id:id});
   },
